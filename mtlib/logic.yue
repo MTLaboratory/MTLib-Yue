@@ -27,7 +27,7 @@ deepCopy = (value)->
 -- 	else return (t1 + t2)
 
 isInstanceOf = (value, of)->
-    if (value == of) return (true)
+    if (value == of) then return (true)
     --if not isType(value, types.TABLE) then return (false)
     --if not isType(of, types.TABLE) then return (false)
     if (value.__class != nil) then
@@ -60,7 +60,15 @@ areAncestors =(tableOfValues, ofClass)->
 
 newArray =(count, fillWith)-> ([(fillWith or 0) for i=1, count])
 
-class List
+class MTObj
+    @Heap: {}
+    new:=>
+        @__id = #(@@Heap)+1
+        @@Heap[@__id] = @
+        (@)
+    __tostring:=> ("MTObj:#{@__id}")
+
+class List extends MTObj
     new: (ofItems)=>
         @Items = {k,v for k,v in pairs(ofItems)}
         (@)
@@ -126,7 +134,7 @@ class List
     --push: (v)=>
     --    @Items[@topKey!+1] = v
 
-class Timer
+class Timer extends MTObj
     update: (dT)=>
         now = os.clock!
         love = (love or nil)
@@ -161,4 +169,5 @@ class Timer
     :areAncestors
     :newArray
     :Timer
+    :MTObj
 }
