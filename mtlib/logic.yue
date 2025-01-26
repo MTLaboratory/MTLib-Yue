@@ -4,7 +4,8 @@ import serialize from require([[mtlib.string]])
 NOP =()->nil
 isCallable = (value)->
 	if (type(value) == types.FUNC) then return (true)
-	if mt = getmetatable(value) then
+    mt = getmetatable(value)
+	if (mt != nil) and (mt != {}) then
 		return (mt.__call != nil) and (type(mt.__call) == types.FUNC)
 	(false)
 deepCopy = (value)->
@@ -71,7 +72,8 @@ class List
     __index: (k)=> (@Items[k] or nil)
     contains: (value, atKey)=>
         if (atKey != nil) then
-            if v = @Items[atKey] then
+            v = @Items[atKey]
+            if (v != nil) then
                 return (value == v)
         else for _,v in pairs(@Items) do
             if (v == value) then return (true)

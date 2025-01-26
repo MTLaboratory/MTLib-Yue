@@ -2,9 +2,10 @@
     -- @Metadata
     _NAME: [[MTLibrary]]
     _AUTHOR: [[MTadder]]
-    _LUAVERSION: [[5.1.5]]
-    _VERSION: [[0.8.8]]
-    _VERSION_NAME: [[Aptera Puff-Adder]]
+    _YUEVERSION: [[0.26.1]]
+    _LUAVERSION: [[5.4]]
+    _VERSION: [[0.8.9]]
+    _VERSION_NAME: [[Aerides]]
     _LICENSE: require [[mtlib.license]]
     -- @Bindings
     ifc: require [[mtlib.ifc]]

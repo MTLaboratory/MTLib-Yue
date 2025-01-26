@@ -1,9 +1,7 @@
 -- Iterable Functions Classes
 
--- TODO
-
 sin =(x, y)->
-	math.sin(x), math.sin(y)
+	return math.sin(x), math.sin(y)
 sphere =(x, y)->
 	fac = (1/(math.sqrt((x*x)+(y*y))))
 	return (fac*x), (fac*y)

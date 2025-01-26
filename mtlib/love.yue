@@ -72,11 +72,13 @@ class PictureBatch extends Element
         (@)
     new: (f, sprites)=>
         error!
-        if @Image = graphics.newImage(f) then
-            @Quads = {}
-            for k,v in pairs(sprites) do
-                assert(v.x and v.y and v.w and v.h)
-                @Quads[k] = graphics.newQuad(v.x, v.y, v.w, v.h, @Image\getDimensions!)
+        @Image = graphics.newImage(f)
+        if (@Image == nil) then
+            return (@)
+        @Quads = {}
+        for k,v in pairs(sprites) do
+            assert(v.x and v.y and v.w and v.h)
+            @Quads[k] = graphics.newQuad(v.x, v.y, v.w, v.h, @Image\getDimensions!)
         (@)
 
 class ConfigGenerator extends FileGenerator
