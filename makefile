@@ -22,5 +22,5 @@ compile:
 	yue mtlib/*.yue *.yue
 test: compile
 	yue -e test.yue
-debug:
+debug: compile
 	yue -e debug.yue

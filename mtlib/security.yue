@@ -1,0 +1,41 @@
+import List, ensureType from require([[mtlib.logic]])
+import types from require([[mtlib.constants]])
+
+class Salt
+    @Chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    new: (size)=>
+        ensureType(data, types.NUMBER)
+        @Data = {}
+        for i = 1, size do
+            rand_index = math.random(1, #(@@Chars))
+            table.insert(@Data, @@Chars\sub(rand_index, rand_index))
+        (@)
+    hash: (data)=>
+        ensureType(data, types.STRING)
+    __tostring:=>
+        tostring @
+
+class Authenticator
+    new: (masterKeySize=128)=>
+        ensureType(data, types.NUMBER)
+        @MasterKey = Salt(masterKeySize)
+        @Keys = List!
+    clear: ()=>
+        @Keys\clear!
+    register: (key)=>
+        if not isType(key, types.STRING) then return (false)
+        @Keys[#@Keys] = key
+        return (true)
+    registerEach: (keys)=>
+        for _,key in pairs(keys) do @register(key)
+    validate: (key, doHash=false)=>
+        if doHash then
+            key = @MasterKey\hash
+        for _,k in pairs(@Keys) do
+            if (key == k) then return (true)
+        (false)
+
+{
+    :Salt
+    :Authenticator
+}

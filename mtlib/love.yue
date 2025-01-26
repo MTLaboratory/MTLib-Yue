@@ -1,14 +1,16 @@
 love = (love or nil)
 if (love == nil) then return false
+
 import graphics, window from love
 
-import Hexad from require [[mtlib.math]]
-import isCallable from require [[mtlib.logic]]
-import types from require [[mtlib.constants]]
+import Hexad from require([[mtlib.math]])
+import isCallable from require([[mtlib.logic]])
+import types from require([[mtlib.constants]])
 import FileGenerator from require([[mtlib.fs]]).generators
 
 class Projector
     new:=> error!
+
 class View
     new: (oX, oY, w, h)=>
         error!
@@ -22,14 +24,18 @@ class View
     renderTo: (func)=>
         @Canvas\renderTo(func)
         (@)
+
 class ListView extends View
     new:=> error!
+
 class GridView extends ListView
     new:=> error!
+
 class Element
     new:=>
         @Position = Hexad!
         (@)
+
 class Label extends Element
     new:(text, alignment='center')=>
         error!
@@ -40,10 +46,13 @@ class Label extends Element
         if (graphics.isActive! == false) then return (nil)
         graphics.printf(@Text, @Position\get!, window.toPixels(#@Text))
         (@)
+
 class Button extends Element
     new:=> error!
+
 class Textbox extends Element
     new:=> error!
+
 class Picture extends Element
     new: (f)=>
         error!
@@ -66,6 +75,7 @@ class Picture extends Element
             @Image = graphics.newImage(iD)
             (@)
     encode: (f, format)=> (@Image\getData!)\encode(format, f)
+
 class PictureBatch extends Element
     draw: (id, x=0, y=0, r=0, sX=0, sY=0)=>
         graphics.draw(@Image, (@Quads[id] or nil), x, y, r, sX, sY)
@@ -73,8 +83,7 @@ class PictureBatch extends Element
     new: (f, sprites)=>
         error!
         @Image = graphics.newImage(f)
-        if (@Image == nil) then
-            return (@)
+        if (@Image == nil) then return (@)
         @Quads = {}
         for k,v in pairs(sprites) do
             assert(v.x and v.y and v.w and v.h)
@@ -83,6 +92,7 @@ class PictureBatch extends Element
 
 class ConfigGenerator extends FileGenerator
     new:=> error!
+
 class MainGenerator extends FileGenerator
     new:=> error!
 
@@ -117,5 +127,6 @@ class MainGenerator extends FileGenerator
         --window.setMode(window.w, window.h, currentFlags)
         --return (screen), (window)
         error!
-    getCenter: (offset, offsetY)-> error!
+    getCenter: (offset, offsetY)->
+        error!
 }

@@ -1,13 +1,19 @@
 import types from require([[mtlib.constants]])
 import serialize from require([[mtlib.string]])
 
-NOP =()->nil
+isType = (value, ofType)-> (type(value) == ofType)
+
+ensureType = (value, ofType)->
+    if not isType(value, ofType) then
+        error("Value (type #{type value}) is not of type #{ofType}")
+
 isCallable = (value)->
 	if (type(value) == types.FUNC) then return (true)
     mt = getmetatable(value)
 	if (mt != nil) and (mt != {}) then
 		return (mt.__call != nil) and (type(mt.__call) == types.FUNC)
 	(false)
+
 deepCopy = (value)->
 	if (type(value) != types.TABLE) then return (value)
 	if (#value == 0) then return ({})
@@ -19,53 +25,63 @@ deepCopy = (value)->
 -- 		for k,v in pairs(t2) do r[k] = v
 -- 		return r
 -- 	else return (t1 + t2)
+
 isInstanceOf = (value, of)->
-    if (value == class) then return true
-    if (type(value) != types.TABLE) then return (false)
+    if (value == of) return (true)
+    --if not isType(value, types.TABLE) then return (false)
+    --if not isType(of, types.TABLE) then return (false)
     if (value.__class != nil) then
-        val_class = value.__class
+        val_cls = value.__class
         if (of.__class != nil) then
-            of_class = of.__class
-            return (val_class.__name == of_class.__name)
-        return (val_class.__name == of)
+            of_cls = of.__class
+            return (val_cls.__name == of_cls.__name)
+        return (val_cls.__name == of)
     (false)
-isAncestor =(value, of)->
+
+isAncestor =(value, of)-> -- REFINE THIS
 	if (value == nil or of == nil) then return (false)
 	if (value.__parent) then
-		if (type(of) == types.STRING) then return (value.__parent.__name == of)
+		if isType(of, types.STRING) then return (value.__parent.__name == of)
 		if (of.__class) then
 			if (value.__parent == of.__class) then return (true)
 			if (value.__parent.__name == of.__class.__name) then return (true)
 			else return (isAncestor(value.__parent, of))
 	(false)
+
 are =(tbl, of)->
-	for _,v in pairs(tbl) do if ((type(v) == of) == false) then return (false)
+	for _,v in pairs(tbl) do
+        if ((type(v) == of) == false) then return (false)
 	(true)
+
 areAncestors =(tableOfValues, ofClass)->
 	for _,v in pairs(tableOfValues) do
         if (isAncestor(v, ofClass) == false) then return (false)
 	(true)
+
 newArray =(count, fillWith)-> ([(fillWith or 0) for i=1, count])
+
 class List
     new: (ofItems)=>
-        error!
-        @Items = {k,v for k,v in pairs(ofItems)} --_deepCopy(ofItems or {})
+        @Items = {k,v for k,v in pairs(ofItems)}
+        (@)
+    clear: ()=> @Items = {}
     combine: (withTbl)=>
-        if (type(withTbl) == type.TABLE) then
+        if isType(withTbl, types.TABLE) then
             for k,v in pairs(withTbl) do @add(v, k)
+        (@)
     __tostring:=> serialize(@Items, ', ')
     __len:=> #@Items
-    __add: (v1, v2)->
-        if (type(v1) != type.TABLE) then return (v2\add(v1))
-        elseif (type(v2) != type.TABLE) then return (v1\add(v2))
-        if (v1.__name == 'List') then
-            if (v2.__name == 'List') then
+    __add: (v1, v2)-> -- TEST ME
+        if not isType(v1, types.TABLE) then return (v2\add(v1))
+        elseif not isType(v2, types.TABLE) then return (v1\add(v2))
+        if isInstanceOf(v1, List) then
+            if isInstanceOf(v2, List) then
                 for k,v in pairs(v2.Items) do v1\add(v, k)
                 return (v1)
             else
                 v2L = List(v2)
                 return (v1 + v2L)
-        elseif (v2.__name == 'List') then
+        elseif isInstanceOf(v2, List) then
             v1L = List(v1)
             return (v1L + v2)
         (nil)
@@ -91,13 +107,13 @@ class List
         for k,v in pairs(@Items) do
             for i=1, iterations do
                 @Items[k] = (doFunc(v, i, k) or v)
-        (nil)
+        (@)
     add: (v, k)=>
         k = (k or (#@Items+1))
         @Items[k] = deepCopy(v)
         @Top = @Items[k]
-        (nil)
-    topKey:=>
+        (@)
+    topKey:=> -- does this work??
         lK = nil
         for k,_ in pairs(@Items) do lK = k
         (lK)
@@ -106,12 +122,18 @@ class List
         (@Items[@topKey!] or nil)
     pop: (atKey)=>
         table.remove(@Items, (atKey or #@Items))
+        (@)
+    --push: (v)=>
+    --    @Items[@topKey!+1] = v
+
 class Timer
     update: (dT)=>
         now = os.clock!
         love = (love or nil)
-        if (love != nil) then dT = (dT or love.timer.getDelta!)
-        else dT = (dT or (now-(@last_update or now)))
+        if (love != nil) then
+            dT = (dT or love.timer.getDelta!)
+        else
+            dT = (dT or (now-(@last_update or now)))
         @Remainder -= dT
         @last_update = now
         if (@Remainder <= 0) then
@@ -119,7 +141,8 @@ class Timer
             @On_Completion!
             return (true)
         (false)
-    isComplete:=> ((@Remainder <= 0) and (@Looping == false))
+    isComplete:=>
+        return ((@Remainder <= 0) and (@Looping == false))
     restart:=>
         @Remainder = @Duration
         (@)

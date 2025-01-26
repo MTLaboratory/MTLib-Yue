@@ -4,14 +4,16 @@
     _AUTHOR: [[MTadder]]
     _YUEVERSION: [[0.26.1]]
     _LUAVERSION: [[5.4]]
-    _VERSION: [[0.8.9]]
+    _VERSION: [[0.8.10]]
     _VERSION_NAME: [[Aerides]]
-    _LICENSE: require [[mtlib.license]]
-    -- @Bindings
-    ifc: require [[mtlib.ifc]]
-    math: require [[mtlib.math]]
-    love: require [[mtlib.love]]
-    logic: require [[mtlib.logic]]
-    string: require [[mtlib.string]]
-    constants: require [[mtlib.constants]]
+    _LICENSE: require([[mtlib.license]])
+
+    -- @Modules
+    security: require([[mtlib.security]])
+    ifc: require([[mtlib.ifc]])
+    math: require([[mtlib.math]])
+    love: require([[mtlib.love]])
+    logic: require([[mtlib.logic]])
+    string: require([[mtlib.string]])
+    constants: require([[mtlib.constants]])
 }

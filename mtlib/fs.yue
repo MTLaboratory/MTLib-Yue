@@ -1,7 +1,7 @@
 -- Filesystem Utilities
 
 fileExists =(filename)->
-	ioF = io.open(filename, 'r+')
+	ioF = io.open(filename, "r+")
 	result = (ioF != nil)
 	if result then ioF\close!
 	(result)
@@ -14,7 +14,7 @@ class FileGenerator
 	new: (file_name, mode)=>
 		assert(file_name, "no file name")
 		@file_name = file_name
-		@file_stream = io.open(file_name, mode or 'rw')
+		@file_stream = io.open(file_name, mode or "rw")
 		(@)
 	isValid:=> (@file_stream != nil)
 	exists:=>
