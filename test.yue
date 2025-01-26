@@ -1,5 +1,4 @@
 _G["mtlib"] = require([[mtlib]])
-lib_string = mtlib.string.serialize(mtlib)
-print(lib_string)
+print(mtlib.string.serialize(mtlib))
 
 return nil

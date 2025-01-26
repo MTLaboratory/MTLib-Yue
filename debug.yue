@@ -4,8 +4,10 @@ serial = mtlib.string.serialize
 
 _G["explore"] =(what)-> print(serial(what))
 
-print(serial(mtlib._NAME) .. serial(mtlib._VERSION) .. serial(mtlib._VERSION_NAME))
+print()
+print("#{mtlib._NAME} v#{mtlib._VERSION} (#{mtlib._VERSION_NAME})")
 print("\ttype `cont` to exit the Lua debugger.")
+print()
 
 debug.debug!
 

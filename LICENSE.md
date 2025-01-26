@@ -1,7 +1,7 @@
 # DON'T BE A DICK PUBLIC LICENSE
 
-Version $1.32$, July $2024$
-Copyright © 2024 Ayden G.W. (_MTadder_)
+Version $1.33$, January $2025$
+Copyright © 2025 Ayden G.W. (_MTadder_)
 
 ---
 
@@ -9,7 +9,7 @@ Everyone is permitted to copy and distribute verbatim or modified copies of this
 
 *TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION*
 
-## 1. Just don't be a dick
+## 1. Just Don't Be A Dick
 
 Do whatever you like with the original work, _just don't be a dick_. Being a dick includes - but is not limited to - the following instances:
 
