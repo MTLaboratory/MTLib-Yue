@@ -1,6 +1,9 @@
 import types from require([[mtlib.constants]])
 import serialize from require([[mtlib.string]])
 
+
+NOOP = ()->nil
+
 isType = (value, ofType)-> (type(value) == ofType)
 
 ensureType = (value, ofType)->
@@ -66,7 +69,7 @@ class MTObj
         @__id = #(@@Heap)+1
         @@Heap[@__id] = @
         (@)
-    __tostring:=> ("MTObj:#{@__id}")
+    __tostring:=> ("MTObj##{@__id}")
 
 class List extends MTObj
     new: (ofItems)=>
@@ -77,7 +80,7 @@ class List extends MTObj
         if isType(withTbl, types.TABLE) then
             for k,v in pairs(withTbl) do @add(v, k)
         (@)
-    __tostring:=> serialize(@Items, ', ')
+    __tostring:=> ("List: #{serialize(@Items, ', ')}")
     __len:=> #@Items
     __add: (v1, v2)-> -- TEST ME
         if not isType(v1, types.TABLE) then return (v2\add(v1))
@@ -135,29 +138,39 @@ class List extends MTObj
     --    @Items[@topKey!+1] = v
 
 class Timer extends MTObj
+    __tostring:=> ("Timer")
     update: (dT)=>
         now = os.clock!
-        love = (love or nil)
+        love or= nil
         if (love != nil) then
             dT = (dT or love.timer.getDelta!)
         else
-            dT = (dT or (now-(@last_update or now)))
-        @Remainder -= dT
-        @last_update = now
-        if (@Remainder <= 0) then
-            if (@Looping == true) then @restart!
-            @On_Completion!
+            dT = (dT or (now-(@lastUpdate or now)))
+        @timeRemaining -= dT
+        @lastUpdate = now
+        if (@timeRemaining <= 0) then
+            if (@oneShot == true and not @hasShot) then
+                @onComplete!
+                @hasShot = true
+                return (true)
+            if (@looping == true) then @restart!
+            @onComplete!
             return (true)
         (false)
     isComplete:=>
-        return ((@Remainder <= 0) and (@Looping == false))
+        return ((@timeRemaining <= 0) and (@looping == false))
     restart:=>
-        @Remainder = @Duration
+        @timeRemaining = @duration
         (@)
-    new: (duration, on_complete, looping=false)=>
-        @Duration, @Looping = duration, looping
-        @last_update = os.clock!
-        @On_Completion = (on_complete or NOP)
+    new: (duration, onComplete, oneShot=true, looping=false)=>
+        duration or= 1.0
+        super!
+        @duration = duration
+        @oneShot = oneShot
+        @hasShot = false
+        @onComplete = (onComplete or NOOP)
+        @looping = looping
+        @lastUpdate = os.clock!
         @restart!
         (@)
 

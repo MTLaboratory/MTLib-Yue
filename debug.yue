@@ -1,8 +1,8 @@
 _G["mtlib"] = require([[mtlib]])
-
-serial = mtlib.string.serialize
-
-_G["explore"] =(what)-> print(serial(what))
+mtlib or= error!
+_G["explore"] =(what)->
+    what or= mtlib
+    print(mtlib.string.serialize(what))
 
 print()
 print("#{mtlib._NAME} v#{mtlib._VERSION} (#{mtlib._VERSION_NAME})")

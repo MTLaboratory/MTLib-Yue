@@ -26,7 +26,7 @@ serialize =(what, depth=0, seen={})->
 		[types.THREAD]: tostring
 		[types.BOOL]: tostring
 		[types.STRING]: (s)-> string.format("%q", s)
-		[types.NUMBER]: (num)-> string.format("%d", num)
+		[types.NUMBER]: (num)-> string.format("%f", num)
 		[types.TABLE]: (t)->
 			rtn = {}
 			seen[t] = tostring t

@@ -1,4 +1,4 @@
-love = (love or nil)
+love or= nil
 if (love == nil) then return false
 
 import graphics, window from love
