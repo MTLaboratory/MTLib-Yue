@@ -4,7 +4,7 @@
     _AUTHOR: [[MTadder]]
     _YUEVERSION: [[0.26.1]]
     _LUAVERSION: [[5.4]]
-    _VERSION: [[0.8.12]]
+    _VERSION: [[0.8.13]]
     _VERSION_NAME: [[Hand-made Pammado]]
     _LICENSE: require([[mtlib.license]])
 
