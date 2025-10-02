@@ -3,7 +3,7 @@ if (love == nil) then return false
 
 import graphics, window from love
 
-import Hexad from require([[mtlib.math]])
+import Hexad from require([[mtlib.maths]])
 import isCallable from require([[mtlib.logic]])
 import types from require([[mtlib.constants]])
 import FileGenerator from require([[mtlib.fs]]).generators
