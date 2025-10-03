@@ -1,11 +1,12 @@
 _G["mtlib"] = require([[mtlib]])
+_G["MTLib"] = _G["mtlib"]
 mtlib or= error!
 _G["explore"] =(what)->
-    print(mtlib.string.serialize(what))
+    print(mtlib.strings.serialize(what))
 
 print()
 print("Running on#{jit and "LuaJIT" or ""} #{jit and jit.version or _VERSION}")
-print("#{mtlib._NAME} v#{mtlib._VERSION} (#{mtlib._VERSION_NAME})")
+print("MTLib v#{mtlib._VERSION_NO} (#{mtlib._VERSION_NAME})")
 print("\ttype `cont` to exit the Lua debugger.")
 print()
 

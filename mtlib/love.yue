@@ -3,98 +3,945 @@ if (love == nil) then return false
 
 import graphics, window from love
 
-import Hexad from require([[mtlib.maths]])
-import isCallable from require([[mtlib.logic]])
-import types from require([[mtlib.constants]])
-import FileGenerator from require([[mtlib.fs]]).generators
+if not RootPath then error("RootPath not set!")
+import Hexad, Color from require("#{RootPath}maths")
+import isCallable, ensureType, isType, isInstanceOf, NOOP, MTObj, deepCopy from require("#{RootPath}logic")
+import types from require("#{RootPath}constants")
+import FileGenerator from require("#{RootPath}fs").generators
+
+unpack or= (table.unpack or error("No unpack!"))
+
+resolveImageSource =(source)->
+    if (source == nil) then return (nil), (nil)
+    srcType = type(source)
+    if srcType == types.STRING then
+        return (graphics.newImage(source)), (source)
+    elseif srcType == types.TABLE then
+        if source.image then return resolveImageSource(source.image)
+        if source.path then
+            return (graphics.newImage(source.path)), (source.path)
+        if source.data then return resolveImageSource(source.data)
+    elseif srcType == types.USERDATA then
+        success, kind = pcall(-> source\type!)
+        if success then
+            if kind == "Image" then
+                return (source), (nil)
+            elseif (kind == "ImageData") or (kind == "CompressedData") or (kind == "FileData") then
+                return (graphics.newImage(source)), (nil)
+        return (source), (nil)
+    else
+        success, kind = pcall(-> source\type!)
+        if success then
+            if kind == "Image" then
+                return (source), (nil)
+            elseif (kind == "ImageData") or (kind == "CompressedData") or (kind == "FileData") then
+                return (graphics.newImage(source)), (nil)
+    error("Unsupported image source for Picture")
+
+countEntries =(tbl)->
+    if (tbl == nil) then return 0
+    total = 0
+    for _ in pairs(tbl) do total += 1
+    (total)
 
 class Projector
-    new:=> error!
+    new: (x=0, y=0, zoomX=1, zoomY=zoomX, rotation=0)=>
+        @Position = Hexad(tonumber(x or 0), tonumber(y or 0))
+        @Scale = {
+            x: tonumber(zoomX or 1)
+            y: tonumber(zoomY or zoomX or 1)
+        }
+        @Rotation = tonumber(rotation or 0)
+        @Viewport = {
+            w: graphics.getWidth!
+            h: graphics.getHeight!
+        }
+        @Active = false
+        (@)
+    setPosition: (x=0, y=0)=>
+        @Position\set(tonumber(x or 0), tonumber(y or 0))
+        (@)
+    move: (dx=0, dy=0)=>
+        pX, pY = @Position\get!
+        @Position\set(pX + tonumber(dx or 0), pY + tonumber(dy or 0))
+        (@)
+    setZoom: (zoomX=1, zoomY)=>
+        zoomY or= zoomX
+        @Scale.x = math.max(1e-4, tonumber(zoomX or 1))
+        @Scale.y = math.max(1e-4, tonumber(zoomY or 1))
+        (@)
+    zoomBy: (factor=1)=>
+        factor = tonumber(factor or 1)
+        @Scale.x = math.max(1e-4, @Scale.x * factor)
+        @Scale.y = math.max(1e-4, @Scale.y * factor)
+        (@)
+    setRotation: (rotation=0)=>
+        @Rotation = tonumber(rotation or 0)
+        (@)
+    rotate: (delta=0)=>
+        @Rotation += tonumber(delta or 0)
+        (@)
+    setViewport: (width=nil, height=nil)=>
+        if (width != nil) and (height != nil) then
+            @Viewport = {
+                w: tonumber(width)
+                h: tonumber(height)
+            }
+        else
+            @Viewport = {
+                w: graphics.getWidth!
+                h: graphics.getHeight!
+            }
+        (@)
+    getPosition:=> @Position\get!
+    getScale:=> (@Scale.x), (@Scale.y)
+    getRotation:=> (@Rotation)
+    attach: (originX=nil, originY=nil)=>
+        if @Active then return (@)
+        vW = (@Viewport and @Viewport.w or graphics.getWidth!)
+        vH = (@Viewport and @Viewport.h or graphics.getHeight!)
+        originX or= (vW * 0.5)
+        originY or= (vH * 0.5)
+        graphics.push!
+        graphics.translate(tonumber(originX), tonumber(originY))
+        graphics.scale(@Scale.x, @Scale.y)
+        graphics.rotate(-@Rotation)
+        pX, pY = @Position\get!
+        graphics.translate(-pX, -pY)
+        @Active = true
+        (@)
+    detach:=>
+        if not @Active then return (@)
+        graphics.pop!
+        @Active = false
+        (@)
+    project: (func, originX=nil, originY=nil)=>
+        if not isCallable(func) then return (@)
+        @attach(originX, originY)
+        ok, result = pcall(func, @)
+        @detach!
+        if not ok then error(result)
+        (result)
 
 class View
-    new: (oX, oY, w, h)=>
-        error!
-        @Position = Hexad(oX, oY)
-        @Conf = { margin: 0 }
-        @Canvas = graphics.newCanvas(w, h)
+    new: (oX=0, oY=0, w=nil, h=nil, options=nil)=>
+        if (oX != nil) and (type(oX) == types.TABLE) then
+            options = oX
+            oX = tonumber(options.x or options[1] or 0)
+            oY = tonumber(options.y or options[2] or 0)
+            w = (options.width or options.w or options[3])
+            h = (options.height or options.h or options[4])
+        elseif (w != nil) and (type(w) == types.TABLE) and (options == nil) then
+            options = w
+            w = options.width or options.w
+            h = options.height or options.h
+        elseif (h != nil) and (type(h) == types.TABLE) and (options == nil) then
+            options = h
+            h = options.height or options.h
+        width = tonumber(w or graphics.getWidth!)
+        height = tonumber(h or graphics.getHeight!)
+        @Position = Hexad(tonumber(oX or 0), tonumber(oY or 0))
+        @Size = {
+            w: width
+            h: height
+        }
+        @Conf = {
+            margin: 0
+            clearColor: { 0, 0, 0, 0 }
+        }
+        if (options != nil) and (type(options) == types.TABLE) then
+            for k,v in pairs(options) do @Conf[k] = v
+        @Canvas = graphics.newCanvas(width, height)
+        @Children = {}
+        @Dirty = true
+        @Projector = Projector(@Position.Position.x, @Position.Position.y)
+        @Projector\setViewport(width, height)
         (@)
-    configure: (param, value)=>
-        @Conf[param] = value
+    configure: (param, value=nil)=>
+        if (type(param) == types.TABLE) then
+            for k,v in pairs(param) do @Conf[k] = v
+        else
+            @Conf[param] = value
+        @markDirty!
         (@)
     renderTo: (func)=>
         @Canvas\renderTo(func)
         (@)
+    markDirty:=>
+        @Dirty = true
+        (@)
+    isDirty:=> (@Dirty == true)
+    getPosition:=> @Position\get!
+    getDimensions:=> (@Size.w), (@Size.h)
+    setPosition: (x=nil, y=nil)=>
+        posX = tonumber((x != nil) and x or @Position.Position.x)
+        posY = tonumber((y != nil) and y or @Position.Position.y)
+        @Position\set(posX, posY)
+        if @Projector then @Projector\setPosition(posX, posY)
+        @markDirty!
+        (@)
+    moveBy: (dx=0, dy=0)=>
+        posX = @Position.Position.x + tonumber(dx or 0)
+        posY = @Position.Position.y + tonumber(dy or 0)
+        @setPosition(posX, posY)
+        (@)
+    setDimensions: (width, height)=>
+        width = tonumber(width or @Size.w)
+        height = tonumber(height or @Size.h)
+        if (width != @Size.w) or (height != @Size.h) then
+            @Size.w, @Size.h = width, height
+            @Canvas = graphics.newCanvas(width, height)
+            @Projector\setViewport(width, height)
+            @markDirty!
+        (@)
+    getProjector:=> (@Projector)
+    addChild: (element, index=nil)=>
+        if (element == nil) then return (@)
+        index or= (#@Children + 1)
+        table.insert(@Children, index, element)
+        @markDirty!
+        (@)
+    removeChild: (element)=>
+        if (element == nil) then return (false)
+        for idx, child in ipairs(@Children) do
+            if (child == element) then
+                table.remove(@Children, idx)
+                @markDirty!
+                return (true)
+        (false)
+    clearChildren:=>
+        if (#@Children == 0) then return (@)
+        @Children = {}
+        @markDirty!
+        (@)
+    eachChild: (func)=>
+        if not isCallable(func) then return (@)
+        for idx, child in ipairs(@Children) do func(child, idx)
+        (@)
+    drawChildren:=>
+        for _, child in ipairs(@Children) do
+            if (child != nil) and (child.isVisible == nil or child\isVisible!) then
+                child\draw!
+        (@)
+    render:=>
+        clearColor = (@Conf.clearColor or { 0, 0, 0, 0 })
+        @Canvas\renderTo(()->
+            graphics.clear(unpack(clearColor))
+            graphics.setColor(1, 1, 1, 1)
+            @drawChildren!
+        )
+        @Dirty = false
+        (@)
+    draw: (x=nil, y=nil, r=0, sX=1, sY=1)=>
+        if @Dirty then @render!
+        drawX = tonumber(x or @Position.Position.x)
+        drawY = tonumber(y or @Position.Position.y)
+        graphics.setColor(1, 1, 1, 1)
+        graphics.draw(@Canvas, drawX, drawY, tonumber(r or 0), tonumber(sX or 1), tonumber(sY or 1))
+        (@)
 
 class ListView extends View
-    new:=> error!
+    new: (oX=0, oY=0, w=nil, h=nil, options=nil)=>
+        useOptions = options
+        if (oX != nil) and (type(oX) == types.TABLE) then
+            useOptions = oX
+            oX = useOptions.x or useOptions[1] or 0
+            oY = useOptions.y or useOptions[2] or 0
+            w = useOptions.width or useOptions.w or useOptions[3]
+            h = useOptions.height or useOptions.h or useOptions[4]
+        super(oX, oY, w, h, useOptions)
+        opts = (useOptions or {})
+        @Spacing = tonumber(opts.spacing or opts.gap or 4)
+        @Conf.alignment or= (opts.alignment or opts.align or "left")
+        @Conf.direction or= (opts.direction or "vertical")
+        (@)
+    setSpacing: (value)=>
+        @Spacing = tonumber(value or @Spacing or 4)
+        @layout!
+        (@)
+    setAlignment: (alignment)=>
+        @Conf.alignment = (alignment or @Conf.alignment or "left")
+        @layout!
+        (@)
+    setDirection: (direction)=>
+        direction = string.lower(tostring(direction or "vertical"))
+        if (direction != @Conf.direction) then
+            @Conf.direction = direction
+            @layout!
+        (@)
+    addChild: (element, index=nil)=>
+        super\addChild(element, index)
+        @layout!
+        (@)
+    removeChild: (element)=>
+        removed = super\removeChild(element)
+        if removed then @layout!
+        (removed)
+    layout:=>
+        if (#@Children == 0) then
+            @ContentSize = { w: 0, h: 0 }
+            return (@)
+        margin = tonumber(@Conf.margin or 0)
+        width, height = @getDimensions!
+        cursorX, cursorY = margin, margin
+        maxLine = 0
+        for _, child in ipairs(@Children) do
+            if (child != nil) and (child.isVisible == nil or child\isVisible!) then
+                cW, cH = child\getSize!
+                cW = tonumber(cW or (width - margin * 2))
+                cH = tonumber(cH or graphics.getFont!\getHeight!)
+                availableW = math.max(0, width - (margin * 2))
+                if cW > availableW then cW = availableW
+                if (@Conf.direction == "horizontal") then
+                    child\setPosition(cursorX, margin)
+                    child\setSize(cW, cH)
+                    cursorX += (cW + @Spacing)
+                    maxLine = math.max(maxLine, cH)
+                else
+                    offsetX = margin
+                    align = string.lower(tostring(@Conf.alignment or "left"))
+                    if align == "center" then
+                        offsetX = margin + math.floor((availableW - cW) * 0.5)
+                    elseif align == "right" then
+                        offsetX = margin + (availableW - cW)
+                    child\setPosition(offsetX, cursorY)
+                    child\setSize(cW, cH)
+                    cursorY += (cH + @Spacing)
+                    maxLine = cursorY
+        if (@Conf.direction == "horizontal") then
+            @ContentSize = {
+                w: cursorX - @Spacing + margin
+                h: math.max(maxLine, height)
+            }
+        else
+            @ContentSize = {
+                w: width
+                h: math.max(maxLine - @Spacing, margin)
+            }
+        @markDirty!
+        (@)
+    drawChildren:=>
+        if @Dirty then @layout!
+        super\drawChildren!
 
 class GridView extends ListView
-    new:=> error!
-
-class Element
-    new:=>
-        @Position = Hexad!
+    new: (oX=0, oY=0, w=nil, h=nil, options=nil)=>
+        useOptions = options
+        if (oX != nil) and (type(oX) == types.TABLE) then
+            useOptions = oX
+            oX = useOptions.x or useOptions[1] or 0
+            oY = useOptions.y or useOptions[2] or 0
+            w = useOptions.width or useOptions.w or useOptions[3]
+            h = useOptions.height or useOptions.h or useOptions[4]
+        super(oX, oY, w, h, useOptions)
+        opts = (useOptions or {})
+        @Columns = math.max(1, tonumber(opts.columns or opts.cols or 2))
         (@)
+    setColumns: (count)=>
+        @Columns = math.max(1, tonumber(count or @Columns or 1))
+        @layout!
+        (@)
+    layout:=>
+        if (#@Children == 0) then
+            @ContentSize = { w: 0, h: 0 }
+            return (@)
+        margin = tonumber(@Conf.margin or 0)
+        spacing = tonumber(@Spacing or 0)
+        width, _ = @getDimensions!
+        availableWidth = math.max(0, width - (margin * 2))
+        cellWidth = 0
+        if (@Columns > 0) then
+            cellWidth = (availableWidth - (spacing * (@Columns - 1))) / @Columns
+        cursorX, cursorY = margin, margin
+        colIndex = 1
+        rowHeight = 0
+        totalHeight = margin
+        for _, child in ipairs(@Children) do
+            if (child != nil) and (child.isVisible == nil or child\isVisible!) then
+                cW, cH = child\getSize!
+                cW = tonumber(cW or cellWidth)
+                cH = tonumber(cH or graphics.getFont!\getHeight!)
+                if cW > cellWidth then cW = cellWidth
+                child\setPosition(cursorX, cursorY)
+                child\setSize(math.max(0, cW), math.max(0, cH))
+                rowHeight = math.max(rowHeight, cH)
+                if colIndex >= @Columns then
+                    colIndex = 1
+                    cursorX = margin
+                    cursorY += (rowHeight + spacing)
+                    totalHeight = cursorY
+                    rowHeight = 0
+                else
+                    colIndex += 1
+                    cursorX += (cellWidth + spacing)
+        if rowHeight > 0 then totalHeight += rowHeight
+        @ContentSize = {
+            w: width
+            h: totalHeight
+        }
+        @markDirty!
+        (@)
+
+class Element extends MTObj
+    new: (x=0, y=0, w=0, h=0, options=nil)=>
+        super(@)
+        opts = options
+        if (type(x) == types.TABLE) then
+            opts = x
+            x = opts.x or opts[1] or 0
+            y = opts.y or opts[2] or 0
+            w = opts.width or opts.w or opts[3] or w
+            h = opts.height or opts.h or opts[4] or h
+        elseif (type(w) == types.TABLE) and (opts == nil) then
+            opts = w
+            w = opts.width or opts.w or w
+            h = opts.height or opts.h or h
+        @matrix = Hexad(tonumber(x or 0), tonumber(y or 0))
+        @size = {
+            width: tonumber(w or 0)
+            height: tonumber(h or 0)
+        }
+        @options = {}
+        if (opts != nil) and (type(opts) == types.TABLE) then
+            for k,v in pairs(opts) do @options[k] = v
+        @options.visible = true
+        @options.font = nil
+        (@)
+    setPosition: (x=0, y=0)=>
+        @matrix\set(tonumber(x or 0), tonumber(y or 0))
+        (@)
+    moveBy: (dx=0, dy=0)=>
+        pX, pY = @matrix\get!
+        @matrix\set(pX + tonumber(dx or 0), pY + tonumber(dy or 0))
+        (@)
+    getPosition:=> return @matrix.position.x, @matrix.position.y
+    setSize: (w=0, h=0)=>
+        @size.width = tonumber(w or 0)
+        @size.height = tonumber(h or 0)
+        (@)
+    getSize:=> return @size.width or 0, @size.height or 0
+    getBounds:=>
+        pX, pY = @getPosition!
+        sW, sH = @getSize!
+        return pX, pY, sW, sH
+    hitTest: (x, y)=>
+        if (x == nil) or (y == nil) then return (false)
+        pX, pY = @getPosition!
+        sW, sH = @getSize!
+        ((x >= pX) and (x <= (pX + sW)) and (y >= pY) and (y <= (pY + sH)))
+    setVisible: (visible=true)=>
+        @options.visible = (visible != false)
+        (@)
+    isVisible:=> (@options.visible != false)
+    setFont: (font)=>
+        @font = font
+        (@)
+    getFont:=> (@font or graphics.getFont!)
+    configure: (param, value=nil)=>
+        if (type(param) == types.TABLE) then
+            for k,v in pairs(param) do @options[k] = v
+        else
+            @options[param] = value
+        (@)
+    getConf: (param, fallback=nil)=> (@options[param] or fallback)
+    draw:=>
+        (@)
+    __tostring:=> ("Element (#{@__id})")
 
 class Label extends Element
     new:(text, alignment='center')=>
-        error!
-        @Text = (tostring(text) or [[NIL]])
-        @Align = alignment
+        opts = nil
+        if (type(alignment) == types.TABLE) then
+            opts = alignment
+            alignment = opts.alignment or opts.align or 'center'
+        else
+            opts = {}
+        super(opts)
+        @text = (tostring(text) or '')
+        @align = alignment
+        @color = opts.color or Color(1, 1, 1, 1)
+        @shadow = opts.shadow or nil
+        if (opts.font != nil) then @setFont(opts.font)
+        font = @getFont!
+        width = tonumber(opts.width or opts.w or @Conf.width or 0)
+        height = tonumber(opts.height or opts.h or @Conf.height or 0)
+        if (width == 0) then width = font\getWidth(@Text)
+        if (height == 0) then height = font\getHeight!
+        @setSize(width, height)
         (@)
     draw:=>
         if (graphics.isActive! == false) then return (nil)
-        graphics.printf(@Text, @Position\get!, window.toPixels(#@Text))
+        if not @isVisible! then return (@)
+        pX, pY = @getPosition!
+        width, _ = @getSize!
+        font = @getFont!
+        effectiveWidth = (width > 0) and width or font\getWidth(@text)
+        limit = (effectiveWidth > 0) and effectiveWidth or window.toPixels(#@text)
+        activeFont = graphics.getFont!
+        useFont = @getFont!
+        if useFont != activeFont then graphics.setFont(useFont)
+        if (@shadow != nil) then
+            sX = pX + (@shadow.x or 1)
+            sY = pY + (@shadow.y or 1)
+            shadowColor = (@shadow.color or { 0, 0, 0, 0.6 })
+            graphics.setColor(unpack(shadowColor))
+            graphics.printf(@text, sX, sY, limit, @align)
+        graphics.setColor(unpack(@color or { 1, 1, 1, 1 }))
+        graphics.printf(@text, pX, pY, limit, @align)
+        graphics.setColor(1, 1, 1, 1)
+        if useFont != activeFont then graphics.setFont(activeFont)
         (@)
+    setText: (value)=>
+        @text = tostring(value or "")
+        font = @getFont!
+        width, height = @getSize!
+        if width == 0 then @size.w = font\getWidth(@text)
+        if height == 0 then @size.h = font\getHeight!
+        (@)
+    setColor: (color)=>
+        assert(isInstanceOf(color, Color), "Label color must be a Color instance")
+        @color = color
+        (@)
+    __tostring:=>
+        ("Label (#{@text})")
 
 class Button extends Element
-    new:=> error!
+    new: (label='Button', options=nil)=>
+        opts = options
+        if (type(label) == types.TABLE) and (opts == nil) then
+            opts = label
+            label = opts.text or opts.label or 'Button'
+        opts or= {}
+        super(opts)
+        @text = tostring(label or "")
+        @padding = tonumber(opts.padding or 8)
+        @radius = tonumber(opts.radius or 4)
+        @colors = {
+            normal: opts.color or Color(0.2, 0.2, 0.26, 1),
+            hover: opts.hoverColor or Color(0.26, 0.26, 0.32, 1),
+            active: opts.activeColor or Color(0.16, 0.16, 0.22, 1),
+            text: opts.textColor or Color(1, 1, 1, 1),
+            border: opts.borderColor or Color(0, 0, 0, 0.35)
+        }
+        if opts.font then
+            @setFont(opts.font)
+        font = @getFont!
+        textW = font\getWidth(@text)
+        textH = font\getHeight!
+        width = tonumber(opts.width or opts.w or (textW + (@padding * 2)))
+        height = tonumber(opts.height or opts.h or (textH + (@padding * 2)))
+        @setSize(width, height)
+        cb = (opts.onPressed or opts.onClick or opts.callback)
+        if cb != nil then
+            if not isCallable(cb) then error("Button callback must be callable")
+            @onPressed = cb
+        else
+            @onPressed = NOOP
+        @state = {
+            hover: false
+            active: false
+            enabled: (opts.enabled != false)
+            pressedLastFrame: false
+        }
+    isEnabled:=> (@state.enabled != false)
+    setEnabled: (enabled=true)=>
+        @state.enabled = (enabled != false)
+        if not @state.enabled then @state.active = false
+        (@)
+    setCallback: (fn)=>
+        if (fn != nil) and (not isCallable(fn)) then
+            error("Button callback must be callable")
+        @onPressed = (fn or NOOP)
+        (@)
+    setText: (value)=>
+        @text = tostring(value or "")
+        font = @getFont!
+        width, height = @getSize!
+        minW = font\getWidth(@text) + (@padding * 2)
+        if width < minW then @size.w = minW
+        (@)
+    update: (dT)=>
+        if not @isEnabled! then return (false)
+        hovered = @hitTest(love.mouse.getX!, love.mouse.getY!) and @isVisible!
+        @state.hover = hovered
+        isDown = love.mouse.isDown(1)
+        wasDown or= @state.pressedLastFrame
+        triggered = false
+        if hovered and isDown and not wasDown then
+            @state.active = true
+        elseif not isDown and @state.active then
+            if hovered then
+                triggered = true
+                @onPressed(@)
+            @state.active = false
+        elseif not hovered then
+            @state.active = false
+        @state.pressedLastFrame = (isDown == true)
+        (nil)
+    draw:=>
+        if (graphics.isActive! == false) then return (nil)
+        if not @isVisible! then return (@)
+        pX, pY, width, height = @getBounds!
+        state = (@state.active and "active") or (@state.hover and "hover") or "normal"
+        fillColor = @colors[state] or @colors.normal
+        graphics.setColor(unpack(fillColor!))
+        graphics.rectangle("fill", pX, pY, width, height, @radius, @radius)
+        if @colors.border then
+            graphics.setColor(unpack(@colors.border!))
+            graphics.rectangle("line", pX, pY, width, height, @radius, @radius)
+        activeFont = graphics.getFont!
+        useFont = @getFont!
+        if useFont != activeFont then graphics.setFont(useFont)
+        graphics.setColor(unpack(@colors.text! or Color(1, 1, 1, 1)!))
+        fontHeight = useFont\getHeight!
+        textY = pY + math.max(@padding, (height - fontHeight) * 0.5)
+        graphics.printf(@text, pX + @padding, textY, math.max(1, width - (@padding * 2)), 'center')
+        graphics.setColor(1, 1, 1, 1)
+        if useFont != activeFont then graphics.setFont(activeFont)
+        (nil)
+    __tostring:=>
+        ("Button (#{@text})")
 
 class Textbox extends Element
-    new:=> error!
+    new: (options=nil)=>
+        opts = options or {}
+        if (type(options) == types.STRING) then
+            opts = { placeholder: options }
+        super(opts)
+        @placeholder = tostring(opts.placeholder or "")
+        @text = tostring(opts.text or opts.value or "")
+        if opts.font then @setFont(opts.font)
+        font = @getFont!
+        width = tonumber(opts.width or opts.w or math.max(font\getWidth(@text), font\getWidth(@placeholder)) + 12)
+        height = tonumber(opts.height or opts.h or (font\getHeight! + 10))
+        @setSize(width, height)
+        @padding = tonumber(opts.padding or 6)
+        @blinkRate = tonumber(opts.blinkRate or 0.5)
+        @blinkTimer = 0
+        @showCursor = true
+        @cursor = (#@text + 1)
+        @focused = (opts.focused == true)
+        @colors = {
+            background: opts.backgroundColor or Color(0.09, 0.09, 0.11, 1),
+            border: opts.borderColor or Color(0.25, 0.25, 0.3, 1),
+            focusBorder: opts.focusBorderColor or Color(0.9, 0.6, 0.2, 1),
+            text: opts.textColor or Color(1, 1, 1, 1),
+            placeholder: opts.placeholderColor or Color(0.7, 0.7, 0.75, 0.7),
+            cursor: opts.cursorColor or Color(1, 1, 1, 1)
+        }
+        @onSubmit = (opts.onSubmit or NOOP)
+        (@)
+    focus:=>
+        @focused = true
+        @blinkTimer = 0
+        @showCursor = true
+        (@)
+    blur:=>
+        @focused = false
+        @showCursor = false
+        (@)
+    isFocused:=> (@focused == true)
+    getText:=> (@text)
+    setText: (value)=>
+        @text = tostring(value or "")
+        @cursor = (#@text + 1)
+        (@)
+    insert: (value)=>
+        if not @focused then return (@)
+        ensureType(value, types.STRING)
+        head = string.sub(@text, 1, @cursor - 1)
+        tail = string.sub(@text, @cursor)
+        @text = head .. value .. tail
+        @cursor += #value
+        (@)
+    backspace:=>
+        if not @focused then return (@)
+        if @cursor <= 1 then return (@)
+        head = string.sub(@text, 1, @cursor - 2)
+        tail = string.sub(@text, @cursor)
+        @text = head .. tail
+        @cursor -= 1
+        (@)
+    delete:=>
+        if not @focused then return (@)
+        if @cursor > #@text then return (@)
+        head = string.sub(@text, 1, @cursor - 1)
+        tail = string.sub(@text, @cursor + 1)
+        @text = head .. tail
+        (@)
+    moveCursor: (delta)=>
+        @cursor = math.min(math.max((@cursor or 1) + tonumber(delta or 0), 1), (#@text + 1))
+        (@)
+    textinput: (value)=>
+        if not @focused then return (@)
+        @insert(value)
+        (@)
+    keypressed: (key)=>
+        if not @focused then return (@)
+        if key == 'backspace' then
+            @backspace!
+        elseif key == 'delete' then
+            @delete!
+        elseif key == 'left' then
+            @moveCursor(-1)
+        elseif key == 'right' then
+            @moveCursor(1)
+        elseif key == 'home' then
+            @cursor = 1
+        elseif key == 'end' then
+            @cursor = (#@text + 1)
+        elseif key == 'return' or key == 'kpenter' then
+            @onSubmit(@text)
+        (@)
+    update: (dt=0)=>
+        if not @focused then return (@)
+        @blinkTimer += tonumber(dt or 0)
+        threshold = (1 / math.max(@blinkRate, 0.01))
+        if @blinkTimer >= threshold then
+            @blinkTimer -= threshold
+            @showCursor = not (@showCursor == true)
+        (@)
+    draw:=>
+        if (graphics.isActive! == false) then return (nil)
+        if not @isVisible! then return (@)
+        pX, pY, width, height = @getBounds!
+        graphics.setColor(unpack(@colors.background))
+        graphics.rectangle('fill', pX, pY, width, height, 3, 3)
+        borderColor = (@focused and @colors.focusBorder) or @colors.border
+        graphics.setColor(unpack(borderColor))
+        graphics.rectangle('line', pX, pY, width, height, 3, 3)
+        activeFont = graphics.getFont!
+        useFont = @getFont!
+        if useFont != activeFont then graphics.setFont(useFont)
+        textColor = ((#@text > 0) and @colors.text) or @colors.placeholder
+        drawText = (#@text > 0) and @text or @placeholder
+        graphics.setColor(unpack(textColor))
+        graphics.printf(drawText, pX + @padding, pY + @padding, width - (@padding * 2), 'left')
+        if @focused and (@showCursor == true) then
+            cursorX = pX + @padding + useFont\getWidth(string.sub(@text, 1, @cursor - 1))
+            graphics.setColor(unpack(@colors.cursor))
+            graphics.rectangle('fill', cursorX, pY + @padding, 1, height - (@padding * 2))
+        graphics.setColor(1, 1, 1, 1)
+        if useFont != activeFont then graphics.setFont(activeFont)
+        (@)
 
 class Picture extends Element
-    new: (f)=>
-        error!
-        @Image = graphics.newImage(f)
+    new: (source, options=nil)=>
+        opts = options
+        imageSource = source
+        if (type(source) == types.TABLE) and (opts == nil) then
+            opts = source
+            imageSource = opts.image or opts.source or opts.path or opts.data
+        elseif (opts != nil) and (type(opts) == types.TABLE) and (imageSource == nil) then
+            imageSource = opts.image or opts.source or opts.path or opts.data
+        super(opts)
+        @path = nil
+        @image = nil
+        @_setImage(imageSource)
+        if (opts != nil) and (opts.filter != nil) then
+            filter = opts.filter
+            if type(filter) == types.STRING then
+                @setFilter(filter)
+            elseif type(filter) == types.TABLE then
+                @setFilter(filter[1], filter[2], filter[3])
+        if (opts != nil) and (opts.wrap != nil) then
+            wrap = opts.wrap
+            if type(wrap) == types.STRING then
+                @setWrap(wrap, wrap)
+            elseif type(wrap) == types.TABLE then
+                @setWrap(wrap[1], wrap[2] or wrap[1])
         (@)
-    draw: (x, y, r, sX, sY)=>
-        graphics.draw(@Image, x, y, r, sX, sY)
+    _setImage: (source)=>
+        if source == nil then
+            error("Picture requires an image source")
+        image, path = resolveImageSource(source)
+        @image = image
+        if path != nil then @path = path
+        if @image != nil then
+            width, height = @image\getDimensions!
+            @setSize(width, height)
         (@)
-    getPixel: (x, y)=> return (@Image\getData!)\getPixel(x, y)
+    setImage: (source)=>
+        @_setImage(source)
+        (@)
+    reload:=>
+        if @path != nil then @_setImage(@path)
+        (@)
+    getImage:=> (@image)
+    getImageData:=>
+        if (@image == nil) then return (nil)
+        if @image.newImageData then
+            return @image\newImageData!
+        elseif @image.getData then
+            return @image\getData!
+        (nil)
+    _replaceWithData: (imageData)=>
+        if imageData == nil then return (@)
+        @image = graphics.newImage(imageData)
+        width, height = imageData\getDimensions!
+        @setSize(width, height)
+        (@)
+    draw: (x=nil, y=nil, r=0, sX=1, sY=1, oX=0, oY=0)=>
+        if (graphics.isActive! == false) then return (nil)
+        if (not @isVisible!) or (@image == nil) then return (@)
+        baseX, baseY = @getPosition!
+        drawX = tonumber((x != nil) and x or baseX)
+        drawY = tonumber((y != nil) and y or baseY)
+        graphics.setColor(1, 1, 1, 1)
+        graphics.draw(@image, drawX, drawY, tonumber(r or 0), tonumber(sX or 1), tonumber(sY or 1), tonumber(oX or 0), tonumber(oY or 0))
+        graphics.setColor(1, 1, 1, 1)
+        (@)
+    getPixel: (x, y)=>
+        imageData = @getImageData!
+        if imageData == nil then return (nil)
+        return imageData\getPixel(x, y)
     setPixel: (x, y, color)=>
+        ensureType(color, types.TABLE)
         assert(#color == 4, [[color table must have 4 values]])
-        iD = @Image\getData!
-        iD\setPixel(x, y, color[1], color[2], color[3], color[4])
-        @Image = graphics.newImage(iD)
+        imageData = @getImageData!
+        if imageData == nil then return (@)
+        imageData\setPixel(x, y, color[1], color[2], color[3], color[4])
+        @_replaceWithData(imageData)
         (@)
-    map: (func, x, y, w, h)=>
-        if isCallable(func) then
-            iD = @Image\getData!
-            iD\mapPixel(func, x, y, w, h)
-            @Image = graphics.newImage(iD)
-            (@)
-    encode: (f, format)=> (@Image\getData!)\encode(format, f)
+    map: (func, x=nil, y=nil, w=nil, h=nil)=>
+        if not isCallable(func) then return (@)
+        imageData = @getImageData!
+        if imageData == nil then return (@)
+        imageData\mapPixel(func, x, y, w, h)
+        @_replaceWithData(imageData)
+        (@)
+    encode: (filePath=nil, format='png')=>
+        imageData = @getImageData!
+        if imageData == nil then return (nil)
+        return imageData\encode(format, filePath)
+    setFilter: (minFilter='linear', magFilter=nil, anisotropy=nil)=>
+        if @image == nil then return (@)
+        @image\setFilter(minFilter, (magFilter or minFilter), anisotropy)
+        (@)
+    setWrap: (wrapH='clamp', wrapV=nil)=>
+        if @image == nil then return (@)
+        @image\setWrap(wrapH, (wrapV or wrapH))
+        (@)
+    setMipmapFilter: (filter, sharpness=nil)=>
+        if @image == nil then return (@)
+        @image\setMipmapFilter(filter, sharpness)
+        (@)
+    setAnisotropy: (value)=>
+        if @image == nil then return (@)
+        @image\setAnisotropy(tonumber(value or 1))
+        (@)
+    clone:=>
+        imageData = @getImageData!
+        if imageData == nil then return (nil)
+        return Picture(imageData)
 
 class PictureBatch extends Element
-    draw: (id, x=0, y=0, r=0, sX=0, sY=0)=>
-        graphics.draw(@Image, (@Quads[id] or nil), x, y, r, sX, sY)
+    new: (source, sprites=nil, options=nil)=>
+        opts = options
+        definitions = sprites
+        imageSource = source
+        if (type(source) == types.TABLE) and (opts == nil) then
+            opts = source
+            imageSource = opts.image or opts.source or opts.path or opts.data
+            definitions = opts.sprites or opts.quads or sprites
+        elseif (opts != nil) and (type(opts) == types.TABLE) and (imageSource == nil) then
+            imageSource = opts.image or opts.source or opts.path or opts.data
+        super(opts)
+        @quads = {}
+        @origins = {}
+        @sprites = (definitions or {})
+        @usage = (opts and (opts.usage or 'dynamic')) or 'dynamic'
+        spriteCount = countEntries(@sprites)
+        @batchSize = math.max(1, tonumber(opts and (opts.limit or opts.batchSize) or spriteCount or 0) or 64)
+        @_setImage(imageSource)
+        @defineQuads(@sprites)
         (@)
-    new: (f, sprites)=>
-        error!
-        @Image = graphics.newImage(f)
-        if (@Image == nil) then return (@)
-        @Quads = {}
-        for k,v in pairs(sprites) do
-            assert(v.x and v.y and v.w and v.h)
-            @Quads[k] = graphics.newQuad(v.x, v.y, v.w, v.h, @Image\getDimensions!)
+    _setImage: (source)=>
+        if source == nil then
+            @image = nil
+            @spriteBatch = nil
+            return (@)
+        image, path = resolveImageSource(source)
+        @image = image
+        @path = path or @path
+        if @image != nil then
+            width, height = @image\getDimensions!
+            @setSize(width, height)
+            @spriteBatch = graphics.newSpriteBatch(@image, math.max(1, @batchSize), @usage)
+            @spriteBatch\clear!
+        else
+            @spriteBatch = nil
+        @instances = {}
         (@)
-
-class ConfigGenerator extends FileGenerator
-    new:=> error!
-
-class MainGenerator extends FileGenerator
-    new:=> error!
+    setImage: (source)=>
+        previousDefs = @quads
+        @_setImage(source)
+        if @image != nil then
+            @quads = {}
+            @origins = {}
+            @defineQuads(@sprites)
+        else
+            @quads = previousDefs
+        (@)
+    defineQuads: (definitions)=>
+        if (definitions == nil) then return (@)
+        ensureType(definitions, types.TABLE)
+        @sprites = definitions
+        for key, def in pairs(definitions) do
+            @defineQuad(key, def)
+        (@)
+    defineQuad: (id, def)=>
+        ensureType(def, types.TABLE)
+        assert(@image != nil, "Cannot define quad without an image")
+        x = tonumber(def.x or def[1] or 0)
+        y = tonumber(def.y or def[2] or 0)
+        w = tonumber(def.w or def.width or def[3])
+        h = tonumber(def.h or def.height or def[4])
+        assert(w and h, "Quad dimensions must be provided")
+        @quads[id] = graphics.newQuad(x, y, w, h, @image\getDimensions!)
+        if (def.ox != nil) or (def.oy != nil) then
+            @origins[id] = { tonumber(def.ox or 0), tonumber(def.oy or 0) }
+        else
+            @origins[id] = nil
+        (@)
+    add: (id, x=0, y=0, r=0, sX=1, sY=1, oX=nil, oY=nil)=>
+        if (@spriteBatch == nil) then return (nil)
+        quad = @quads[id]
+        assert(quad, "Unknown quad '#{id}'")
+        origin = @origins[id] or { 0, 0 }
+        handle = @spriteBatch\add(quad, tonumber(x or 0), tonumber(y or 0), tonumber(r or 0), tonumber(sX or 1), tonumber(sY or 1), tonumber(oX or origin[1]), tonumber(oY or origin[2]))
+        @instances[#@instances + 1] = handle
+        (handle)
+    setInstance: (handle, id, x=0, y=0, r=0, sX=1, sY=1, oX=nil, oY=nil)=>
+        if (@spriteBatch == nil) then return (false)
+        quad = @quads[id]
+        if quad == nil then return (false)
+        origin = @origins[id] or { 0, 0 }
+        @spriteBatch\set(handle, quad, tonumber(x or 0), tonumber(y or 0), tonumber(r or 0), tonumber(sX or 1), tonumber(sY or 1), tonumber(oX or origin[1]), tonumber(oY or origin[2]))
+        (true)
+    clear:=>
+        if @spriteBatch != nil then @spriteBatch\clear!
+        @instances = {}
+        (@)
+    flush:=>
+        if @spriteBatch != nil then @spriteBatch\flush!
+        (@)
+    draw: (id=nil, x=0, y=0, r=0, sX=1, sY=1, oX=0, oY=0)=>
+        if (graphics.isActive! == false) then return (nil)
+        if not @isVisible! then return (@)
+        baseX, baseY = @getPosition!
+        if (id == nil) and (@spriteBatch != nil) then
+            graphics.setColor(1, 1, 1, 1)
+            graphics.draw(@spriteBatch, baseX + x, baseY + y, tonumber(r or 0), tonumber(sX or 1), tonumber(sY or 1))
+            graphics.setColor(1, 1, 1, 1)
+        elseif (@image != nil) then
+            quad = @quads[id]
+            if quad == nil then return (@)
+            origin = @origins[id] or { 0, 0 }
+            graphics.setColor(1, 1, 1, 1)
+            graphics.draw(@image, quad, baseX + x, baseY + y, tonumber(r or 0), tonumber(sX or 1), tonumber(sY or 1), tonumber(oX or origin[1]), tonumber(oY or origin[2]))
+            graphics.setColor(1, 1, 1, 1)
+        (@)
 
 {
     :View
@@ -108,25 +955,101 @@ class MainGenerator extends FileGenerator
     :PictureBatch
     :Projector
     generators: {
-        :MainGenerator
 		:ConfigGenerator
     }
-    patternColorizer: (str, colors)-> error!
+    patternColorizer: (str, colors)->
+        ensureType(str, types.STRING)
+        ensureType(colors, types.TABLE)
+        defaultColor = colors.default or Color(1, 1, 1, 1)
+        result = {}
+        entries = {}
+        if colors.order != nil then
+            ensureType(colors.order, types.TABLE)
+            for _, pattern in ipairs(colors.order) do
+                if (pattern != 'default') and (colors[pattern] != nil) then
+                    table.insert(entries, { pattern: pattern, data: colors[pattern] })
+        else
+            for key, value in pairs(colors) do
+                if key != 'default' then
+                    table.insert(entries, { pattern: key, data: value })
+        append =(color, text)->
+            if (text == nil) or (text == '') then return
+            if type(color) != types.TABLE then color = defaultColor
+            count = #result
+            if (count >= 2) and (result[count - 1] == color) then
+                result[count] ..= text
+            else
+                table.insert(result, color)
+                table.insert(result, text)
+        idx = 1
+        strLength = #str
+        while idx <= strLength do
+            match = nil
+            matchColor = nil
+            matchTransform = nil
+            for _, entry in ipairs(entries) do
+                pattern = entry.pattern
+                data = entry.data
+                colorValue = data
+                transform = nil
+                plainSearch = true
+                if type(data) == types.TABLE then
+                    transform = data.transform
+                    if data.pattern == true then
+                        plainSearch = false
+                    elseif data.plain != nil then
+                        plainSearch = (data.plain != false)
+                    if data.color then
+                        colorValue = data.color
+                    elseif data[1] != nil then
+                        colorValue = data
+                startPos, endPos = string.find(str, pattern, idx, plainSearch)
+                if (startPos != nil) and (startPos == idx) then
+                    if (match == nil) or (endPos > match.e) then
+                        match = { s: startPos, e: endPos }
+                        matchColor = colorValue
+                        matchTransform = transform
+            if match != nil then
+                segment = string.sub(str, match.s, match.e)
+                if (matchTransform != nil) and isCallable(matchTransform) then
+                    transformed = matchTransform(segment)
+                    if transformed != nil then segment = transformed
+                append((matchColor or defaultColor), segment)
+                idx = match.e + 1
+            else
+                append(defaultColor, string.sub(str, idx, idx))
+                idx += 1
+        result
     scaleWindow: (ratio=1)->
-        --oldW, oldH, currentFlags = window.getMode!
-        --screen, window = {}, {}
-        --screen.w, screen.h = window.getDesktopDimensions(currentFlags.display)
-        --newWindowWidth = truncate(screen.w / monitorRatio)
-        --newWindowHeight = truncate(screen.h / monitorRatio)
-        --if ((oldW == newWindowWidth) and (oldH == newWindowHeight)) then return (nil), (nil)
-        --window.display, window.w = currentFlags.display, newWindowWidth
-        --window.h = newWindowHeight
-        --window.x = math.floor((screen.w*0.5)-(window.w*0.5))
-        --window.y = math.floor((screen.h*0.5)-(window.h*0.5))
-        --currentFlags.x, currentFlags.y = window.x, window.y
-        --window.setMode(window.w, window.h, currentFlags)
-        --return (screen), (window)
-        error!
-    getCenter: (offset, offsetY)->
-        error!
+        ratio = tonumber(ratio or 1)
+        if (ratio == nil) or (ratio <= 0) then error("ratio must be greater than zero")
+        oldW, oldH, flags = window.getMode!
+        origFlags = deepCopy(flags or {})
+        display = (flags and flags.display) or 1
+        success, desktopW, desktopH = pcall(-> window.getDesktopDimensions(display))
+        if not success then
+            success2, fallbackW, fallbackH = pcall(-> window.getDesktopDimensions(1))
+            if success2 then
+                desktopW, desktopH = fallbackW, fallbackH
+            else
+                desktopW, desktopH = (oldW * ratio), (oldH * ratio)
+        newW = math.floor(math.min(desktopW, math.max(64, oldW * ratio)))
+        newH = math.floor(math.min(desktopH, math.max(64, oldH * ratio)))
+        newFlags = deepCopy(flags or {})
+        if (desktopW != nil) and (desktopH != nil) then
+            newFlags.x = math.floor((desktopW - newW) * 0.5)
+            newFlags.y = math.floor((desktopH - newH) * 0.5)
+        oldState = { width: oldW, height: oldH, flags: origFlags, changed: false }
+        if (newW == oldW) and (newH == oldH) then
+            return (oldState), ({ width: newW, height: newH, flags: deepCopy(newFlags), changed: false })
+        window.setMode(newW, newH, newFlags)
+        updatedW, updatedH, updatedFlags = window.getMode!
+        return (oldState), ({ width: updatedW, height: updatedH, flags: updatedFlags, changed: true })
+    getCenter: (offset=0, offsetY=nil)->
+        offsetY or= offset
+        width = graphics.getWidth!
+        height = graphics.getHeight!
+        centerX = (width * 0.5) + tonumber(offset or 0)
+        centerY = (height * 0.5) + tonumber(offsetY or 0)
+        (math.floor(centerX)), (math.floor(centerY))
 }

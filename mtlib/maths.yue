@@ -1,5 +1,6 @@
-import MTObj, isInstanceOf from require([[mtlib.logic]])
-import types from require([[mtlib.constants]])
+if not RootPath then error("RootPath not set!")
+import MTObj, isInstanceOf from require("#{RootPath}logic")
+import types from require("#{RootPath}constants")
 
 clamp =(v, l=0, u=1)-> math.max(l, math.min(v, u))
 
@@ -50,13 +51,13 @@ isWithinCircle =(x, y, oX, oY, oR)->
 class Dyad extends MTObj
 	lerp: (o, d, d1)=>
 		if isInstanceOf(o, "Dyad") then
-			@Position.x = lerp(@Position.x, o.Position.x, tonumber(d))
-			@Position.y = lerp(@Position.y, o.Position.y, tonumber(d))
+			@position.x = lerp(@position.x, o.position.x, tonumber(d))
+			@position.y = lerp(@position.y, o.position.y, tonumber(d))
 		elseif isType(o, types.NUMBER) then
-			@Position.x = lerp(@Position.x, o, d1)
-			@Position.x = lerp(@Position.y, d, d1)
+			@position.x = lerp(@position.x, o, d1)
+			@position.x = lerp(@position.y, d, d1)
 		(@)
-	get:=> (@Position.x), (@Position.y)
+	get:=> (@position.x), (@position.y)
 	equals: (o, o2)=>
 		if (o == nil) then
 			return (false)
@@ -64,21 +65,21 @@ class Dyad extends MTObj
 			return (false)
 		elseif isInstanceOf(o, "Dyad") then
 			return (
-				(@Position.x == o.Position.x) and
-				(@Position.y == o.Position.y)
+				(@position.x == o.position.x) and
+				(@position.y == o.position.y)
 			)
 		elseif (isType(o2, types.NUMBER) and (o != nil)) then
-			return ((@Position.x == o) and (@Position.y == o2))
+			return ((@position.x == o) and (@position.y == o2))
 		(false)
 	distance: (o=0, o2=0)=>
 		if (isType(o, types.NUMBER) and isType(o2, types.NUMBER)) then
-			return distance(@Position.x, @Position.y, o, o2)
+			return distance(@position.x, @position.y, o, o2)
 		if isInstanceOf(o, "Dyad") then
-			return @distance(o.Position.x, o.Position.y)
+			return @distance(o.position.x, o.position.y)
 		(nil)
 	set: (x, y)=>
-		@Position or= {}
-		@Position.x, @Position.y = tonumber(x or 0), tonumber(y or 0)
+		@position or= {}
+		@position.x, @position.y = tonumber(x or 0), tonumber(y or 0)
 		(@)
 	__call: (x, y)=> @set(x, y)
 	new: (x, y)=>
@@ -89,24 +90,24 @@ class Tetrad extends Dyad
 	lerp: (o, d)=>
 		if isInstanceOf(o, "Tetrad") then
 			super\lerp(o, d)
-			@Velocity.x = lerp(@Velocity.x, o.Position.x, tonumber(d))
-			@Velocity.y = lerp(@Velocity.y, o.Position.y, tonumber(d))
+			@velocity.x = lerp(@velocity.x, o.position.x, tonumber(d))
+			@velocity.y = lerp(@velocity.y, o.position.y, tonumber(d))
 		(@)
 	distance: (o)=> (super\distance(o))
 	set: (x, y, xV, yV)=>
 		super\set(x, y)
-		@Velocity or= {}
-		@Velocity.x, @Velocity.y = tonumber(xV or 0), tonumber(yV or 0)
+		@velocity or= {}
+		@velocity.x, @velocity.y = tonumber(xV or 0), tonumber(yV or 0)
 	get:=> unpack({
-		@Position.x, @Position.y,
-		@Velocity.x, @Velocity.y })
+		@position.x, @position.y,
+		@velocity.x, @velocity.y })
 	update: (dT=(1/60))=>
-		@Position.x += (@Velocity.x*dT)
-		@Position.y += (@Velocity.y*dT)
+		@position.x += (@velocity.x*dT)
+		@position.y += (@velocity.y*dT)
 	impulse: (angle, force)=>
 		v = (math.cos(angle)*force)
-		@Velocity.x += v
-		@Velocity.y += v
+		@velocity.x += v
+		@velocity.y += v
 	__call: (x, y, xV, yV)=>
 		@set(x, y, xV, yV)
 		(@)
@@ -121,20 +122,20 @@ class Hexad extends Tetrad
 	__tostring:=> ("Hexad")
 	set: (x, y, xV, yV, r, rV)=>
 		super\set(x, y, xV, yV)
-		@Rotator or= {}
-		@Rotator.value = tonumber(r or 0)
-		@Rotator.inertia = tonumber(rV or 0)
+		@rotator or= {}
+		@rotator.value = tonumber(r or 0)
+		@rotator.inertia = tonumber(rV or 0)
 		(@)
 	get:=> unpack({
-		@Position.x, @Position.y,
-		@Velocity.x, @Velocity.y,
-		@Rotator.value, @Rotator.inertia })
+		@position.x, @position.y,
+		@velocity.x, @velocity.y,
+		@rotator.value, @rotator.inertia })
 	update: (dT=(1 / 60))=>
 		super\update(dT)
-		@Rotator.value += (@Rotator.inertia * dT)
+		@rotator.value += (@rotator.inertia * dT)
 		(@)
 	torque: (by)=>
-		@Rotator.inertia += tonumber(by)
+		@rotator.inertia += tonumber(by)
 		(@)
 
 class Octad extends Hexad
@@ -143,43 +144,44 @@ class Octad extends Hexad
 		(@set(x, y, xV, yV, r, rV, dA, dE))
 	set: (x, y, xV, yV, r, rV, dA, dE)=>
 		super\set(x, y, xV, yV, r, rV)
-		@Dimensional or= {}
-		@Dimensional.address = tonumber(dA or 0)
-		@Dimensional.entropy = tonumber(dE or 0)
+		@dimensional or= {}
+		@dimensional.address = tonumber(dA or 0)
+		@dimensional.entropy = tonumber(dE or 0)
 		(@)
 	get:=> unpack({
-		@Position.x, @Position.y,
-		@Velocity.x, @Velocity.y,
-		@Rotator.value, @Rotator.inertia,
-		@Dimensional.address, @Dimensional.entropy })
+		@position.x, @position.y,
+		@velocity.x, @velocity.y,
+		@rotator.value, @rotator.inertia,
+		@dimensional.address, @dimensional.entropy })
 	shake: (by)=>
-		@Dimensional.entropy += tonumber(by)
+		@dimensional.entropy += tonumber(by)
 	update: (dT=(1 / 60))=>
 		super\update(dT)
-		@Dimensional.address += (@Dimensional.entropy * dT)
+		@dimensional.address += (@dimensional.entropy * dT)
 		(@)
 
 class Shape extends MTObj
-	new: (oX, oY)=>
+	new: ()=>
 		super!
-		(@set(oX, oY))
-	set: (oX, oY)=>
-		@Origin or= Dyad(tonumber(oX or 0), tonumber(oY or 0))
+		@origin = Dyad(0, 0)
+		(@)
+	setOrigin: (oX, oY)=>
+		@origin.position.x = tonumber(oX or error("oX required!"))
+		@origin.position.y = tonumber(oY or error("oY required!"))
 		(@)
 
 class Circle extends Shape
-	set: (oX, oY, radi)=>
-		super\set(oX, oY)
-		@Radius = tonumber(radi or math.pi)
-		(@)
-	draw: (mode)=>
-		love or= nil
-		if (love == nil) then error('missing LOVE2D!')
-		love.graphics.circle(mode, @Origin.x, @Origin.y, @Radius)
-		(@)
 	new: (x, y, rad)=>
 		super!
 		(@set(x, y, rad))
+	set: (oX, oY, radi)=>
+		super\setOrigin(oX, oY)
+		@radius = tonumber(radi or math.pi)
+		(@)
+	draw: (mode)=>
+		love = love or error("Missing LOVE2D!")
+		love.graphics.circle(mode, @origin.x, @origin.y, @radius)
+		(@)
 
 class Line extends Shape
 	new: (oX, oY, eX, eY)=>
@@ -187,20 +189,20 @@ class Line extends Shape
 		(@set(oX, oY, eX, eY))
 	set: (oX, oY, eX, eY)=>
 		super\set(oX, oY)
-		@Ending = Dyad(eX, eY)
+		@ending = Dyad(eX, eY)
 		(@)
 	get:=> unpack({
-		@Origin.Position.x, @Origin.Position.y,
-		@Ending.Position.x, @Ending.Position.x })
+		@origin.position.x, @origin.position.y,
+		@ending.position.x, @ending.position.y })
 	--distance: (o, o2)=> error!
 	getLength:=>
-		sOX, sOY = @Origin\get!
-		sEX, sEY = @Ending\get!
+		sOX, sOY = @origin\get!
+		sEX, sEY = @ending\get!
 		(math.sqrt(math.pow(sEX-sOX, 2) + math.pow(sEY - sOY, 2)))
 	getSlope:=>
 		(
-			(@Ending.Position.x - @Origin.Position.x) /
-			(@Ending.Position.y - @Origin.Position.y)
+			(@ending.position.x - @origin.position.x) /
+			(@ending.position.y - @origin.position.y)
 		)
 	intersects: (o)=> error!
 		-- if isInstanceOf(o, 'Dyad') then
@@ -221,24 +223,24 @@ class Rectangle extends Shape
 		super!
 		(@set(oX, oY, lX, lY))
 	set: (oX, oY, lX, lY)=>
-		super\set(oX, oY)
-		@Limits or= Dyad(lX, lY)
+		super\setOrigin(oX, oY)
+		@limits or= Dyad(lX, lY)
 		(@)
 	get:=> unpack({
-		@Origin.Position.x, @Origin.Position.y,
-		@Limits.Position.x, @Limits.Position.y })
-	area:=> (@Limits.Position.x*@Limits.Position.y)
+		@origin.position.x, @origin.position.y,
+		@limits.position.x, @limits.position.y })
+	area:=> (@limits.position.x*@limits.position.y)
 	perimeter:=>
-		((2 * (@Limits.Position.x)) + (2 * (@Limits.Position.y)))
+		((2 * (@limits.position.x)) + (2 * (@limits.position.y)))
 	diagonal:=>
-		math.sqrt(((@Limits.Position.x) ^ 2)+((@Limits.Position.y) ^ 2))
+		math.sqrt(((@limits.position.x) ^ 2)+((@limits.position.y) ^ 2))
 	contains: (o)=>
 		if isInstanceOf(o, "Dyad") then
 			sOX, sOY, sLX, sLY = @get!
 			oPX, oPY = o\get!
 			return isWithinRegion(oPX, oPY, sOX, sOY, sLX, sLY)
 		elseif isInstanceOf(o, "Line") then
-			return (@contains(o.Origin) and @contains(o.Ending))
+			return (@contains(o.origin) and @contains(o.ending))
 		elseif isInstanceOf(o, "Rectangle") then
 			for i,l in ipairs(o\getLines!) do
 				if (@contains(l) == false) then return (false)
@@ -262,6 +264,52 @@ class Polygon extends Shape
 		super!
 		error!
 
+class Color
+	new: (r=1, g=1, b=1, a=1)=>
+		@R = clamp(tonumber(r or 1), 0, 1)
+		@G = clamp(tonumber(g or 1), 0, 1)
+		@B = clamp(tonumber(b or 1), 0, 1)
+		@A = clamp(tonumber(a or 1), 0, 1)
+		(@)
+	__add: (othercolor)=>
+		if not isInstanceOf(othercolor, Color) then return (nil)
+		Color(
+			clamp(@R + othercolor.R, 0, 1),
+			clamp(@G + othercolor.G, 0, 1),
+			clamp(@B + othercolor.B, 0, 1),
+			clamp(@A + othercolor.A, 0, 1)
+		)
+	__sub: (value)=>
+		if not isInstanceOf(value, Color) then return (nil) -- this needs testing
+		Color(
+			clamp(@R - value.R, 0, 1),
+			clamp(@G - value.G, 0, 1),
+			clamp(@B - value.B, 0, 1),
+			clamp(@A - value.A, 0, 1)
+		)
+	__div: (value)=>
+		if not isInstanceOf(value, Color) then return (nil)
+		Color(
+			clamp(@R / value.R, 0, 1),
+			clamp(@G / value.G, 0, 1),
+			clamp(@B / value.B, 0, 1),
+			clamp(@A / value.A, 0, 1)
+		)
+	__mul: (value)=>
+		if not isInstanceOf(value, Color) then return (nil)
+		Color(
+			clamp(@R * value.R, 0, 1),
+			clamp(@G * value.G, 0, 1),
+			clamp(@B * value.B, 0, 1),
+			clamp(@A * value.A, 0, 1)
+		)
+	__eq: (value)=>
+		if not isInstanceOf(value, Color) then return (false)
+		((@R == value.R) and (@G == value.G) and (@B == value.B) and (@A == value.A))
+	__call: ()=>
+		({@R, @G, @B, @A})
+	__tostring:=> ("Color(#{@R}, #{@G}, #{@B}, #{@A})")
+
 {
     :sign
     :sigmoid
@@ -273,6 +321,8 @@ class Polygon extends Shape
     :pingPong
     :isWithinRegion
     :isWithinCircle
+
+	:Color
 
     :Dyad
     :Tetrad

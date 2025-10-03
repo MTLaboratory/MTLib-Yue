@@ -11,15 +11,8 @@ else
 endif
 
 default: compile
-# FIXME
-#clean:
-#	$(RM) $(call FixPath, mtlib/*.lua)
-#	$(RM) $(call FixPath, mtlib/*.moon)
-#	$(RM) $(call FixPath, *.lua)
-#	$(RM) $(call FixPath, *.moon)
 compile:
-	@ echo compiling MTLib...
-	yue mtlib/*.yue *.yue
+	yue -l mtlib/*.yue *.yue
 test: compile
 	yue -e test.yue
 debug: compile

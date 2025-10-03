@@ -1,5 +1,8 @@
-_G["mtlib"] = require([[mtlib]])
-print(mtlib.string.serialize(mtlib))
+-- _G["mtlib"] = require([[mtlib]])
+import "mtlib" as MTLib
+
+print(MTLib.strings.serialize(MTLib))
+
 print("Running on#{jit and "LuaJIT" or ""} #{jit and jit.version or _VERSION}")
 
 return nil

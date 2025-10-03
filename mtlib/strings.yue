@@ -1,11 +1,12 @@
-import types from require([[mtlib.constants]])
-import isType, MTObj from require([[mtlib.logic]])
+if not RootPath then error("RootPath not set!")
+import types from require("#{RootPath}constants")
+import isType, MTObj from require("#{RootPath}logic")
 
 getValueAddress =(f, l)->
 	if ((l == nil) and isType(f, types.FUNC)) then l = true
 	return ("#{((l and "0x") or "")}#{(tostring(f)\gsub("%a*:%s*0?", "")\upper!)}")
 
-serialize =(what, depth=0, seen={})->
+serialize =(what, maxDepth=50, depth=0, seen={})->
 	tokens = {
 		[types.NIL]: tostring
 		[types.FUNC]: tostring
@@ -19,14 +20,20 @@ serialize =(what, depth=0, seen={})->
 			seen[t] = tostring t
 			depth += 1
 			tab = ("\t")\rep(depth)
+			is_class = (t.__class != nil)
 			class_id = if what.__class then
 				"class: #{tostring(t)\gsub("table: ", "")} " else ""
+			if (depth > maxDepth) then
+				members = 0
+				for k,v in pairs(t) do
+					if (k != "__parent") then members += 1
+				return if is_class then class_id else "#{t} ||#{members}"
 			for k,m in pairs(t) do
 				if (k == "__parent") then continue
 				rtn[(#rtn)+1] = if (seen[m] != nil) then
 					(tab.."[#{tostring k}] = recursion(#{tostring(m)})\n")
 				else
-					(tab.."[#{tostring k}] = #{serialize(m, depth, seen)}\n")
+					(tab.."[#{tostring k}] = #{serialize(m, maxDepth, depth, seen)}\n")
 			seen[t] = nil
 			return (class_id.."{\n"..table.concat(rtn, "")..("\t")\rep(depth - 1).."}")
 	}

@@ -1,5 +1,6 @@
-import MTObj, List, ensureType from require([[mtlib.logic]])
-import types from require([[mtlib.constants]])
+if not RootPath then error("RootPath not set!")
+import MTObj, List, ensureType from require("#{RootPath}logic")
+import types from require("#{RootPath}constants")
 
 class Salt extends MTObj
     @Chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

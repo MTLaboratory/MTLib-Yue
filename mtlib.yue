@@ -1,6 +1,6 @@
-local path = ... .. '.'
+global RootPath = ... .. '.'
 
-if path == null
+if RootPath == null
     return error("Module path not provided")
 
 {
@@ -12,14 +12,14 @@ if path == null
     _LUAVERSION: [[5.4]]
     _VERSION_NO: [[0.9.1]]
     _VERSION_NAME: [[Innoculate Laminae]]
-    _LICENSE: require("#{path}mtlib.license")
+    _LICENSE: require("#{RootPath}license")
 
     -- @Modules
-    security: require("#{path}mtlib.security")
-    ifc: require("#{path}mtlib.ifc") -- Iterable Functions Classes
-    maths: require("#{path}mtlib.maths")
-    love: require("#{path}mtlib.love")
-    logic: require("#{path}mtlib.logic")
-    strings: require("#{path}mtlib.strings")
-    constants: require("#{path}mtlib.constants")
+    security: require("#{RootPath}security")
+    ifc: require("#{RootPath}ifc") -- Iterable Functions Classes
+    maths: require("#{RootPath}maths")
+    love: require("#{RootPath}love")
+    logic: require("#{RootPath}logic")
+    strings: require("#{RootPath}strings")
+    constants: require("#{RootPath}constants")
 }

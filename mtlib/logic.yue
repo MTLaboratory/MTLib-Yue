@@ -1,4 +1,5 @@
-import types from require([[mtlib.constants]])
+if not RootPath then error("RootPath not set!")
+import types from require("#{RootPath}constants")
 
 generateUUID =()->
 	fn =(x)->
@@ -23,22 +24,11 @@ isCallable = (value)->
 	(false)
 
 deepCopy = (value)->
-	if not isType(value, types.TABLE) then return (value)
-	if (#value == 0) then return ({})
+    if (type(value) != types.TABLE) then return (value)
 	(setmetatable({k,v for k,v in pairs value}, getmetatable(value)))
-
--- export combine = (t1, t2)->
--- 	if ((t1 == nil) or (t2 == nil)) then return ((t1 or t2) or nil)
--- 	if ((type(t1) == types.TABLE) and (type(t1) == type(t2))) then
--- 		r = _deepCopy(t1)
--- 		for k,v in pairs(t2) do r[k] = v
--- 		return r
--- 	else return (t1 + t2)
 
 isInstanceOf = (value, of)->
     if (value == of) then return (true)
-    --if not isType(value, types.TABLE) then return (false)
-    --if not isType(of, types.TABLE) then return (false)
     if (value.__class != nil) then
         val_cls = value.__class
         if (of.__class != nil) then
@@ -70,86 +60,46 @@ areAncestors =(tableOfValues, ofClass)->
 newArray =(count, fillWith)-> ([(fillWith or 0) for i=1, count])
 
 class MTObj
-    @Heap: {}
-    @clearHeap: ->
-        @@Heap = {}
-        (nil)
     new: =>
         @__id = generateUUID!
-        @@Heap[@__id] = @
         (@)
-    getID: => (@__id)
-    free: =>
-        @@Heap[@__id] = nil
-        (@)
-    __tostring:=> ("MTObj")
+    -- __tostring:=> ("MTObj: #{@__id}")
 
 class List extends MTObj
-    new: (ofItems)=>
-        super!
-        @Items = {k,v for k,v in pairs(ofItems)}
+    new: (ofItems=nil)=>
+        super(@)
+        if (ofItems == nil) then
+            @items = {}
+            return (@)
+        elseif type(ofItems) == types.TABLE then
+            @items = {k,v for k,v in pairs(ofItems)}
+        else
+            @items = {ofItems}
         (@)
-    clear: ()=> @Items = {}
-    combine: (withTbl)=>
-        if isType(withTbl, types.TABLE) then
-            for k,v in pairs(withTbl) do @add(v, k)
+    clear: ()=>
+        @items = {}
         (@)
-    --__tostring:=> ("List: #{serialize(@Items, ', ')}")
-    __len:=> #@Items
-    __add: (v1, v2)-> -- TEST ME
-        if not isType(v1, types.TABLE) then return (v2\add(v1))
-        elseif not isType(v2, types.TABLE) then return (v1\add(v2))
-        if isInstanceOf(v1, List) then
-            if isInstanceOf(v2, List) then
-                for k,v in pairs(v2.Items) do v1\add(v, k)
-                return (v1)
-            else
-                v2L = List(v2)
-                return (v1 + v2L)
-        elseif isInstanceOf(v2, List) then
-            v1L = List(v1)
-            return (v1L + v2)
-        (nil)
-    __index: (k)=> (@Items[k] or nil)
-    contains: (value, atKey)=>
-        if (atKey != nil) then
-            v = @Items[atKey]
-            if (v != nil) then
-                return (value == v)
-        else for _,v in pairs(@Items) do
+    count: ()=> (#@items)
+    contains: (value)=>
+        for _,v in pairs(@items) do
             if (v == value) then return (true)
         (false)
-    removeAt: (idx)=>
-        @Items[idx] = nil
-        (@Items[idx] == nil)
     remove: (item)=>
-        for k,v in pairs(@Items) do
+        for k,v in pairs(@items) do
             if (v == item) then
-                @Items[k] = nil
+                @items[k] = nil
                 return (true)
         (false)
     forEach: (doFunc, iterations=1)=>
-        for k,v in pairs(@Items) do
+        for k,v in pairs(@items) do
             for i=1, iterations do
-                @Items[k] = (doFunc(v, i, k) or v)
+                @items[k] = (doFunc(v, i, k) or v)
         (@)
-    add: (v, k)=>
-        k = (k or (#@Items+1))
-        @Items[k] = deepCopy(v)
-        @Top = @Items[k]
+    insert: (v)=>
+        @items[(#@items+1)] = deepCopy(v)
         (@)
-    topKey:=> -- does this work??
-        lK = nil
-        for k,_ in pairs(@Items) do lK = k
-        (lK)
-    top:=>
-        if (@Top != nil) then return (@Top)
-        (@Items[@topKey!] or nil)
-    pop: (atKey)=>
-        table.remove(@Items, (atKey or #@Items))
-        (@)
-    --push: (v)=>
-    --    @Items[@topKey!+1] = v
+    __tostring:=>
+        ("List(#{@__id})")
 
 class Timer extends MTObj
     __tostring:=> ("Timer")
@@ -200,6 +150,7 @@ class Timer extends MTObj
     :are
     :areAncestors
     :newArray
+
     :Timer
     :List
     :MTObj
