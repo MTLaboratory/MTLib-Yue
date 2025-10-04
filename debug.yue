@@ -4,6 +4,13 @@ mtlib or= error!
 _G["explore"] =(what)->
     print(mtlib.strings.serialize(what))
 
+li = MTLib.logic.List!
+li\insertAll(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+_=-li
+explore(li)
+
+for k,v in pairs(li!) do print("Item #{k}: #{v}")
+
 print()
 print("Running on#{jit and "LuaJIT" or ""} #{jit and jit.version or _VERSION}")
 print("MTLib v#{mtlib._VERSION_NO} (#{mtlib._VERSION_NAME})")

@@ -70,6 +70,16 @@ class MTObj
         (@)
     -- __tostring:=> ("MTObj: #{@__id}")
 
+class Memoizer
+    new: =>
+        @cache = {}
+        (@)
+    memoize: (key, computeFunc)=>
+        assert(isCallable(computeFunc), "computeFunc must be a callable function")
+        if (@cache[key] == nil) then
+            @cache[key] = computeFunc!
+        @cache[key]
+
 class List
     __tostring:=> ("List")
     new: (ofItems)=>
@@ -77,10 +87,16 @@ class List
         if (ofItems == nil) then
             @items = {}
             return (@)
-        elseif type(ofItems) == types.TABLE then
+        elseif (type(ofItems) == types.TABLE) then
             @items = {k,v for k,v in pairs(ofItems)}
         else
             @items = {ofItems}
+        (@)
+    __call: ()=> (@items)
+    __unm:=>
+        -- reverse the order of items list (idx 0 becomes last idx)
+        for i=1, math.floor(#@items/2) do
+            @items[i], @items[#@items-i+1] = @items[#@items-i+1], @items[i]
         (@)
     clear: ()=>
         @items = {}
@@ -101,6 +117,10 @@ class List
         for k,v in pairs(@items) do
             for i=1, iterations do
                 @items[k] = (doFunc(v, i, k) or v)
+        (@)
+    insertAll: (...)=>
+        for _,v in pairs({...}) do
+            @items[(#@items+1)] = deepCopy(v)
         (@)
     insert: (v)=>
         @items[(#@items+1)] = deepCopy(v)
@@ -156,4 +176,5 @@ class Timer extends MTObj
     :Timer
     :List
     :MTObj
+    :Memoizer
 }
