@@ -1,0 +1,11 @@
+if not RootPath then error("RootPath not set!")
+logic = require("#{RootPath}logic")
+-- Player (Character) controller
+
+MTObj = logic.MTObj
+
+class Player extends MTObj
+    __tostring:=> ("Player(#{@__id})")
+    new: ()=>
+        super!
+        (@)

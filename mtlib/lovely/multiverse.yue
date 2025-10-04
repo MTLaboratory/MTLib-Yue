@@ -1,0 +1,33 @@
+-- Multiverse (Dimension) management (Box2D Worlds)
+if not RootPath then error("RootPath not set!")
+logic = require("#{RootPath}logic")
+
+deepCopy = logic.deepCopy
+isType = logic.isType
+
+MTObj = logic.MTObj
+List = logic.List
+
+class Multiverse extends MTObj
+    __tostring:=> ("Multiverse (#{@verses\count!}-verse)")
+    new: (count=2)=>
+        super!
+        @verses = List!
+        for i=1, count do @branch!
+        assert(@verses != nil, "Failed to create worlds list!")
+        assert(@verses\count! == count, "Failed to create all worlds!")
+        (@)
+    update: (dT)=>
+        assert(isType(dT, logic.types.NUMBER), "dT must be a number!")
+        for _,verse in pairs(@verses) do
+            verse\update(dT)
+        (@)
+    forEach: (doFunc, ...)=>
+        assert(isType(doFunc, logic.types.FUNCTION), "doFunc must be a function!")
+        for _,verse in pairs(@verses) do
+            doFunc(verse, ...)
+        (@)
+    branch: ()=>
+        @verses\insert(deepCopy(love.physics.newWorld( 0, 0, false)))
+        @current = @verses\top!
+        (@)

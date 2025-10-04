@@ -1,8 +1,165 @@
--- _G["mtlib"] = require([[mtlib]])
+print()
+
 import "mtlib" as MTLib
 
-print(MTLib.strings.serialize(MTLib))
+-- Fuzz testing (Fuzzing) involves feeding a large amount
+-- of random data to a target program and monitoring
+-- its states to find vulnerabilities 
+class Fuzzer
+    new: (fuzz, opts = {})=>
+        -- target object/table containing callables
+        @fuzzObj = fuzz
+        -- config
+        @minArgs = opts.minArgs or 0
+        @maxArgs = opts.maxArgs or 3
+        @iterations = opts.iterations or 3 -- times to try each callable
+        @seed = opts.seed
+        -- compat unpack
+        @unpack = (table.unpack or unpack)
+        -- simple stats
+        @stats =
+            calls: 0
+            errors: 0
+            failures: {}
+        -- seed RNG (deterministic when seed provided)
+        if @seed != nil then
+            math.randomseed(@seed)
+        else
+            math.randomseed(os.time!)
+        (@)
 
-print("Running on#{jit and "LuaJIT" or ""} #{jit and jit.version or _VERSION}")
+    _randBool: => math.random(0, 1) == 1
+    _randInt: (min = -1000, max = 1000)=> math.random(min, max)
+    _randFloat: (min = -1000, max = 1000)=> (min + (max - min) * math.random!)
+    _randString: (len = nil)=>
+        len = (len or math.random(0, 16))
+        chars = {}
+        for i = 1, len do
+            chars[i] = string.char(math.random(32, 126)) -- printable ASCII
+        table.concat(chars)
+    _randTable: (depth = 1)=>
+        n = math.random(0, 5)
+        t = {}
+        for i = 1, n do
+            key = @_randString(math.random(1, 8))
+            val = if (depth > 0) and (math.random! < 0.2) then @_randTable(depth - 1) else @_randValue!
+            t[key] = val
+        t
+    _randValue: =>
+        r = math.random!
+        if r < 0.10 then return nil
+        if r < 0.25 then return @_randBool!
+        if r < 0.55 then return @_randInt!
+        if r < 0.80 then return @_randFloat!
+        if r < 0.95 then return @_randString!
+        @_randTable 1
+    _buildArgs: =>
+        n = math.max(@minArgs, math.min(@maxArgs, math.random(@minArgs, @maxArgs)))
+        args = {}
+        for i = 1, n do args[i] = @_randValue!
+        args
+    _argTypes: (args)=>
+        types = {}
+        for i = 1, #args do types[i] = type(args[i])
+        types
+    _tryCall: (callable, args, withSelf = false, name = nil)=>
+        -- use plain function reference for unpack to prevent accidental method call semantics
+        unpackFn = (table.unpack or unpack)
+        f = nil
+        if withSelf then
+            f = -> callable(@fuzzObj, unpackFn(args))
+        else
+            f = -> callable(unpackFn(args))
+        ok, res = xpcall(f, debug.traceback)
+        if (not ok) then
+            @stats.errors += 1
+            table.insert(@stats.failures, {
+                name: (name or tostring(callable))
+                withSelf: withSelf
+                err: res
+                argsCount: (#args or 0)
+                argsTypes: @_argTypes(args)
+            })
+        else
+            @stats.calls += 1
+        ok
+    _fuzzFunc: (func, name = nil)=>
+        -- calls the provided func with random arguments, tries both raw and self-injected
+        for i = 1, @iterations do
+            args = @_buildArgs!
+            ok = @_tryCall(func, args, false, name)
+            if (not ok) then @_tryCall(func, args, true, name)
+        (true)
+    __call: ()=>
+        for k, v in pairs(@fuzzObj) do
+            if MTLib.logic.isCallable(v) then @_fuzzFunc(v, k)
+        -- return truthy so it plays nice with the simple test runner
+        (true)
+
+Tests = {}
+
+-- Assertions
+assert(MTLib, "MTLib not loaded")
+assert(MTLib.logic, "MTLib.logic not loaded")
+assert(MTLib.strings, "MTLib.strings not loaded")
+assert(MTLib.security, "MTLib.security not loaded")
+-- assert(MTLib.love, "MTLib.love not loaded")
+assert(MTLib.ifc, "MTLib.ifc not loaded")
+assert(MTLib._LICENSE, "MTLib._LICENSE not loaded")
+assert(MTLib.filesystem, "MTLib.filesystem not loaded")
+assert(MTLib.constants, "MTLib.constants not loaded")
+
+-- Helper to run a fuzzer on a module and print stats
+runFuzz = (name, mod, opts = {})->
+    unless mod
+        print(string.format("Skipping fuzz: %s (module missing)", name))
+        return { ok: true, stats: { calls: 0, errors: 0, failures: {} } }
+    f = Fuzzer(mod, {
+        minArgs: opts.minArgs or 0
+        maxArgs: opts.maxArgs or 4
+        iterations: opts.iterations or 2
+        seed: (opts.seed or os.time!)
+    })
+    f!
+    print(string.format("Fuzzed %-10s -> calls: %d, errors: %d", name, f.stats.calls, f.stats.errors))
+    { ok: (f.stats.errors == 0), stats: f.stats }
+
+Tests["fuzz_logic"] = ()->
+    runFuzz("logic", MTLib.logic, { iterations: 5 })
+
+Tests["fuzz_strings"] = ()->
+    runFuzz("strings", MTLib.strings, { iterations: 5 })
+
+Tests["fuzz_maths"] = ()->
+    runFuzz("maths", (MTLib.maths or MTLib.math), { iterations: 5 })
+
+Tests["fuzz_ifc"] = ()->
+    runFuzz("ifc", MTLib.ifc, { iterations: 5 })
+
+Tests["fuzz_security"] = ()->
+    runFuzz("security", MTLib.security, { iterations: 5 })
+
+-- Intentionally avoid fuzzing filesystem by default to prevent side-effects.
+
+for k,test in pairs(Tests) do
+    print()
+    res = test!
+    ok = (res.ok ~= nil) and res.ok or (res.stats and res.stats.errors == 0)
+    stats = res.stats or {}
+    if ok then
+        print("\tTest #{k} passed. calls: #{stats.calls}, errors: #{stats.errors}")
+    else
+        print("\tTest #{k} failed! calls: #{stats.calls}, errors: #{stats.errors}")
+        fails = stats.failures or {}
+        maxToPrint = 5
+        count = 0
+        for i, fail in ipairs(fails) do
+            count = count + 1
+            if count > maxToPrint then break
+            print("[#{k} error ##{i}]: withSelf=#{fail and fail.withSelf} err=#{fail and fail.err}")
+        if (#fails or 0) > maxToPrint then
+            print("\t\t... and #{#fails - maxToPrint} more failures")
+print()
+print("Finished testing on#{jit and "LuaJIT" or ""} #{jit and jit.version or _VERSION}")
 
 return nil

@@ -1,17 +1,9 @@
 #!/usr/bin/make -f
 
-ifdef OS
-	RM = del /Q
-	FixPath = $(subst /,\,$1)
-else
-	ifeq ($(shell uname), Linux)
-		RM = rm -f
-		FixPath = $1
-	endif
-endif
-
 default: compile
-compile:
+clean:
+	rm -rfv *.lua mtlib/*.lua MTLib-Yue.zip
+compile: clean
 	yue -l mtlib/*.yue *.yue
 test: compile
 	yue -e test.yue

@@ -1,6 +1,10 @@
 if not RootPath then error("RootPath not set!")
-import MTObj, isInstanceOf from require("#{RootPath}logic")
-import types from require("#{RootPath}constants")
+logic = require("#{RootPath}logic")
+contants = require("#{RootPath}constants")
+
+isInstanceOf = logic.isInstanceOf
+types = contants.types
+MTObj = logic.MTObj
 
 clamp =(v, l=0, u=1)-> math.max(l, math.min(v, u))
 
@@ -49,6 +53,13 @@ isWithinCircle =(x, y, oX, oY, oR)->
 -- 	((s >= 0) and (s <= 1) and (t >= 0) and (t <= 1))
 
 class Dyad extends MTObj
+	new: (x, y)=>
+		super!
+		@(x, y)
+	move: (dX, dY)=>
+		@position.x += tonumber(dX or 0)
+		@position.y += tonumber(dY or 0)
+		(@)
 	lerp: (o, d, d1)=>
 		if isInstanceOf(o, "Dyad") then
 			@position.x = lerp(@position.x, o.position.x, tonumber(d))
@@ -82,9 +93,6 @@ class Dyad extends MTObj
 		@position.x, @position.y = tonumber(x or 0), tonumber(y or 0)
 		(@)
 	__call: (x, y)=> @set(x, y)
-	new: (x, y)=>
-		super!
-		@(x, y)
 
 class Tetrad extends Dyad
 	lerp: (o, d)=>

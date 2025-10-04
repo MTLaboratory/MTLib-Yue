@@ -1,9 +1,9 @@
 if not RootPath then error("RootPath not set!")
 import types from require("#{RootPath}constants")
-import isType, MTObj from require("#{RootPath}logic")
+-- logic = require("#{RootPath}logic")
 
 getValueAddress =(f, l)->
-	if ((l == nil) and isType(f, types.FUNC)) then l = true
+	if ((l == nil) and type(f) == types.TABLE) then l = true
 	return ("#{((l and "0x") or "")}#{(tostring(f)\gsub("%a*:%s*0?", "")\upper!)}")
 
 serialize =(what, maxDepth=50, depth=0, seen={})->
@@ -39,8 +39,15 @@ serialize =(what, maxDepth=50, depth=0, seen={})->
 	}
 	(tokens[type(what)](what, seen))
 
+generateUUID =()->
+	fn =(x)->
+		r = (math.random(16)-1)
+		r = ((x == "x") and (r+1) or (r%4)+9)
+		return ("0123456789abcdef"\sub(r, r))
+	("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"\gsub("[xy]", fn))
+
 {
-	:UUID
+	:generateUUID
 	:getValueAddress
 	:serialize
 }

@@ -22,4 +22,5 @@ if RootPath == null
     logic: require("#{RootPath}logic")
     strings: require("#{RootPath}strings")
     constants: require("#{RootPath}constants")
+    filesystem: require("#{RootPath}filesystem")
 }
